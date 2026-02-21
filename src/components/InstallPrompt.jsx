@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import './InstallPrompt.css';
-import appLogo from '../assets/logo.svg';
 
 const InstallPrompt = () => {
   const [showPrompt, setShowPrompt] = useState(false);
@@ -60,7 +59,7 @@ const InstallPrompt = () => {
       <div className="install-prompt" onClick={(e) => e.stopPropagation()}>
         <button className="install-close" onClick={handleDismiss}>×</button>
         
-        <img src={appLogo} alt="App Logo" className="install-icon" style={{ width: 56, height: 56, borderRadius: 12 }} />
+        <div className="install-icon">📱</div>
         <h3 className="install-title">Add to Home Screen</h3>
         <p className="install-desc">
           Install Expense Tracker for a faster, app-like experience!
