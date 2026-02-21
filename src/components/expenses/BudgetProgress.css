@@ -1,0 +1,152 @@
+.budget-progress {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-color);
+}
+
+.budget-progress h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.budget-section {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--primary);
+}
+
+.budget-section:last-child {
+  margin-bottom: 0;
+}
+
+.budget-section.exceeded {
+  border-left-color: var(--error);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.budget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.budget-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+
+.budget-amount {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.budget-amount.exceeded {
+  color: var(--error);
+  font-weight: 600;
+}
+
+.progress-bar {
+  height: 8px;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+  position: relative;
+}
+
+.progress-fill.exceeded {
+  background: var(--error);
+}
+
+.category-budgets {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.category-budgets h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.category-budget {
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.category-budget.exceeded {
+  border-color: var(--error);
+  background: rgba(239, 68, 68, 0.02);
+}
+
+.no-budget {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .budget-progress {
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .budget-progress h3 {
+    font-size: 0.95rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .budget-section {
+    padding: 0.6rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .budget-header {
+    margin-bottom: 0.4rem;
+  }
+
+  .budget-label {
+    font-size: 0.85rem;
+  }
+
+  .budget-amount {
+    font-size: 0.75rem;
+  }
+
+  .category-budget {
+    padding: 0.6rem;
+  }
+
+  .no-budget {
+    padding: 1rem;
+    font-size: 0.85rem;
+  }
+}

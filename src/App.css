@@ -1,0 +1,72 @@
+.app {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+}
+
+.app-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Professional Page Transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: all 250ms ease-out;
+}
+
+.page-exit {
+  opacity: 1;
+}
+
+.page-exit-active {
+  opacity: 0;
+  transition: all 200ms ease-in;
+}
+
+/* Smooth Scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Professional Focus States */
+*:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Selection */
+::selection {
+  background: var(--primary-light);
+  color: var(--primary-dark);
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .app-container {
+    padding: 0.5rem;
+    max-width: 100%;
+  }
+}
+
+/* Tablet Optimizations */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .app-container {
+    padding: 1.5rem;
+    max-width: 1200px;
+  }
+}
+
+/* Desktop Enhancements */
+@media (min-width: 1025px) {
+  .app-container {
+    padding: 2rem;
+  }
+}
