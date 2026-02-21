@@ -7,13 +7,8 @@ const InstallPrompt = () => {
   const [isIOS, setIsIOS] = useState(false);
 
   useEffect(() => {
-    // Don't show if already installed or dismissed recently
-    const dismissed = localStorage.getItem('installPromptDismissed');
-    if (dismissed) {
-      const dismissedTime = parseInt(dismissed, 10);
-      // Don't show again for 7 days
-      if (Date.now() - dismissedTime < 7 * 24 * 60 * 60 * 1000) return;
-    }
+    // Don't show if already dismissed in this session
+    if (sessionStorage.getItem('installPromptDismissed')) return;
 
     // Check if already running as PWA
     if (window.matchMedia('(display-mode: standalone)').matches) return;
@@ -54,7 +49,7 @@ const InstallPrompt = () => {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    localStorage.setItem('installPromptDismissed', Date.now().toString());
+    sessionStorage.setItem('installPromptDismissed', 'true');
   };
 
   if (!showPrompt) return null;
