@@ -1,14 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import api from '@services/api';
 import { useAuth } from '@context/AuthContext';
+import avatarGifs from '@data/avatarGifs';
 import './ProfilePage.css';
 
 const ProfilePage = () => {
   const { user, login, logout } = useAuth();
-  const fileInputRef = useRef(null);
   
   const [name, setName] = useState(user?.name || '');
-  const [profileImage, setProfileImage] = useState(user?.profileImage || '');
+  const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || '');
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [monthlyBudget, setMonthlyBudget] = useState(user?.budgets?.monthly || 0);
   const [dailyBudget, setDailyBudget] = useState(user?.budgets?.daily || 0);
   const [categoryBudgets, setCategoryBudgets] = useState(user?.budgets?.categoryBudgets || {});
@@ -53,42 +54,13 @@ const ProfilePage = () => {
     }));
   };
 
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const handleAvatarSelect = (gifUrl) => {
+    setSelectedAvatar(gifUrl);
+    setShowAvatarPicker(false);
+  };
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Image size should be less than 5MB' });
-      return;
-    }
-
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      setMessage({ type: 'error', text: 'Please select a valid image file' });
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const formData = new FormData();
-      formData.append('profileImage', file);
-
-      const response = await api.post('/users/upload-profile-image', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      setProfileImage(response.data.profileImage);
-      setMessage({ type: 'success', text: '✓ Profile image updated!' });
-      setTimeout(() => setMessage({ type: '', text: '' }), 3000);
-    } catch (error) {
-      console.error('Failed to upload image:', error);
-      setMessage({ type: 'error', text: '✗ Failed to upload image' });
-    } finally {
-      setSaving(false);
-    }
+  const getSelectedAvatarGif = () => {
+    return avatarGifs.find(g => g.url === selectedAvatar);
   };
 
   const handleLogout = () => {
@@ -105,6 +77,7 @@ const ProfilePage = () => {
       const updatedUser = {
         name,
         defaultView,
+        avatar: selectedAvatar,
         budgets: {
           monthly: Number(monthlyBudget),
           daily: Number(dailyBudget),
@@ -177,39 +150,31 @@ const ProfilePage = () => {
           <section className="form-section">
             <h2>👤 Personal Info</h2>
             
-            {/* Profile Image Section */}
+            {/* Avatar GIF Section */}
             <div className="form-group profile-image-section">
-              <label>Profile Picture</label>
+              <label>Profile Avatar</label>
               <div className="profile-image-container">
-                <div className="profile-image-wrapper">
-                  {profileImage ? (
+                <div 
+                  className="profile-image-wrapper avatar-clickable"
+                  onClick={() => setShowAvatarPicker(true)}
+                  title="Click to change avatar"
+                >
+                  {selectedAvatar ? (
                     <img 
-                      src={profileImage} 
-                      alt="Profile" 
-                      className="profile-image"
+                      src={selectedAvatar} 
+                      alt={getSelectedAvatarGif()?.label || 'Avatar'} 
+                      className="profile-image avatar-gif"
                     />
                   ) : (
                     <div className="profile-image-placeholder">
                       <span className="placeholder-icon">👤</span>
                     </div>
                   )}
-                  <button
-                    type="button"
-                    className="change-image-btn"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={saving}
-                  >
-                    📷
-                  </button>
+                  <div className="change-avatar-overlay">
+                    <span>✏️ Change</span>
+                  </div>
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageChange}
-                  style={{ display: 'none' }}
-                />
-                <small className="help-text">Click camera icon to change picture (Max 5MB)</small>
+                <small className="help-text">Click avatar to choose a GIF</small>
               </div>
             </div>
 
@@ -331,6 +296,35 @@ const ProfilePage = () => {
           </div>
         </form>
       </div>
+
+      {/* Avatar Picker Modal */}
+      {showAvatarPicker && (
+        <div className="dialog-overlay" onClick={() => setShowAvatarPicker(false)}>
+          <div className="avatar-picker-dialog" onClick={(e) => e.stopPropagation()}>
+            <div className="avatar-picker-header">
+              <h3>Choose Your Avatar</h3>
+              <button 
+                className="avatar-picker-close"
+                onClick={() => setShowAvatarPicker(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="avatar-grid">
+              {avatarGifs.map((gif) => (
+                <div
+                  key={gif.id}
+                  className={`avatar-grid-item ${selectedAvatar === gif.url ? 'selected' : ''}`}
+                  onClick={() => handleAvatarSelect(gif.url)}
+                >
+                  <img src={gif.url} alt={gif.label} loading="lazy" />
+                  <span className="avatar-label">{gif.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Logout Confirmation Dialog */}
       {showLogoutDialog && (
