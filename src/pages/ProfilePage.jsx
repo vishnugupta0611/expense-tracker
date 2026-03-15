@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import api from '@services/api';
 import { useAuth } from '@context/AuthContext';
 import avatarGifs from '@data/avatarGifs';
@@ -138,6 +139,16 @@ const ProfilePage = () => {
           </div>
         </div>
       )}
+
+      {/* My Schedule Link */}
+      <Link to="/schedule" className="profile-schedule-link">
+        <div className="profile-schedule-icon">📅</div>
+        <div className="profile-schedule-info">
+          <h3>My Schedule</h3>
+          <p>Plan your daily routine &amp; weekly activities</p>
+        </div>
+        <span className="profile-schedule-arrow">→</span>
+      </Link>
 
       <div className="profile-content">
         {message.text && (

@@ -10,6 +10,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SpaceAnalyticsPage from './pages/SpaceAnalyticsPage';
 import ShoppingListPage from './pages/ShoppingListPage';
 import HistoryPage from './pages/HistoryPage';
+import SchedulePage from './pages/SchedulePage';
 import InstallPrompt from './components/InstallPrompt';
 import './styles/global.css';
 import './App.css';
@@ -99,6 +100,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <HistoryPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/schedule"
+          element={
+            <ProtectedRoute>
+              <SchedulePage />
             </ProtectedRoute>
           }
         />
