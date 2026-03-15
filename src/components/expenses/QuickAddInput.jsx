@@ -3,45 +3,45 @@ import api from '@services/api.js';
 import SuccessNotification from '@components/shared/SuccessNotification';
 import './QuickAddInput.css';
 
+const CATEGORY_EMOJI = {
+  Food: '🍕', Transport: '🚗', Bills: '💡',
+  Grocery: '🛒', Entertainment: '🎬', Other: '📦',
+};
+
 const QuickAddInput = ({ categories, onExpenseAdded }) => {
   const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Other');
   const [loading, setLoading] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [showCustomInput, setShowCustomInput] = useState(false);
-  const [customCategory, setCustomCategory] = useState('');
   const [showFloatingForm, setShowFloatingForm] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    if (!amount || parseFloat(amount) <= 0) {
-      return;
-    }
+  // If note has text → use it as the category label (custom tag)
+  // Otherwise → use selected chip
+  const getCategory = () => note.trim() || selectedCategory;
 
-    const categoryToUse = showCustomInput && customCategory.trim() 
-      ? customCategory.trim() 
-      : selectedCategory;
+  const reset = () => {
+    setAmount('');
+    setNote('');
+    setSelectedCategory('Other');
+    setShowFloatingForm(false);
+  };
 
+  const submit = async () => {
+    if (!amount || parseFloat(amount) <= 0) return;
     try {
       setLoading(true);
-      await api.post('/expenses', {
+      const res = await api.post('/expenses', {
         amount: parseFloat(amount),
-        category: categoryToUse,
+        category: getCategory(),
+        description: note.trim() || undefined,
       });
-      
-      // Show success animation
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
-        setAmount('');
-        setSelectedCategory('Other');
-        setCustomCategory('');
-        setShowCustomInput(false);
-        setShowFloatingForm(false);
-        onExpenseAdded();
-      }, 1000);
-      
+        reset();
+        onExpenseAdded(res.data.expense);
+      }, 900);
     } catch (error) {
       console.error('Failed to add expense:', error);
     } finally {
@@ -49,18 +49,28 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
     }
   };
 
-  const handleCustomCategorySubmit = () => {
-    if (customCategory.trim()) {
-      setSelectedCategory(customCategory.trim());
-      setShowCustomInput(false);
-    }
-  };
+  const handleSubmit = (e) => { e.preventDefault(); submit(); };
+
+  const ChipRow = () => (
+    <div className="category-chips">
+      {categories.map((cat) => (
+        <button
+          key={cat}
+          type="button"
+          className={`category-chip ${selectedCategory === cat && !note.trim() ? 'active' : ''}`}
+          onClick={() => { setSelectedCategory(cat); setNote(''); }}
+        >
+          {CATEGORY_EMOJI[cat] || '🏷️'} {cat}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <>
-      {/* Floating Add Button - Only show on personal expenses */}
+      {/* Floating button */}
       {!window.location.pathname.includes('/spaces/') && (
-        <button 
+        <button
           className="floating-add-btn"
           onClick={() => setShowFloatingForm(!showFloatingForm)}
           title="Quick Add Expense"
@@ -69,152 +79,104 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
         </button>
       )}
 
-      {/* Floating Form */}
+      {/* Floating modal — bottom sheet on mobile, centered on desktop */}
       {showFloatingForm && (
-        <div className="floating-form-overlay" onClick={() => setShowFloatingForm(false)}>
-          <div className="floating-form" onClick={(e) => e.stopPropagation()}>
-            <h3>Quick Add Expense</h3>
+        <div className="floating-overlay" onClick={() => setShowFloatingForm(false)}>
+          <div className="floating-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="floating-modal-header">
+              <span>Add Expense</span>
+              <button type="button" className="modal-close-btn" onClick={() => setShowFloatingForm(false)}>×</button>
+            </div>
             <form onSubmit={handleSubmit}>
-              <input
-                type="number"
-                step="0.01"
-                placeholder="Enter amount..."
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={loading}
-                autoFocus
-              />
-              <div className="floating-categories">
-                {categories.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={`category-chip ${selectedCategory === category ? 'active' : ''}`}
-                    onClick={() => {
-                      setSelectedCategory(category);
-                      setShowCustomInput(false);
-                    }}
-                  >
-                    {category}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  className="category-chip add-custom"
-                  onClick={() => setShowCustomInput(true)}
-                >
-                  + Custom
-                </button>
+              <div className="modal-amount-row">
+                <span className="modal-currency">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="modal-amount-input"
+                  placeholder="0"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={loading}
+                  autoFocus
+                />
               </div>
-              {showCustomInput && (
-                <div className="custom-category-input">
-                  <input
-                    type="text"
-                    value={customCategory}
-                    onChange={(e) => setCustomCategory(e.target.value)}
-                    placeholder="Enter category..."
-                    className="custom-input"
-                  />
-                  <button type="button" onClick={handleCustomCategorySubmit}>✓</button>
-                  <button type="button" onClick={() => setShowCustomInput(false)}>×</button>
-                </div>
-              )}
+
+              <div className="modal-note-wrap">
+                <input
+                  type="text"
+                  className="modal-note-input"
+                  placeholder="Note — type to use as custom tag"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  disabled={loading}
+                />
+                {note.trim() && (
+                  <span className="note-tag-preview">
+                    🏷️ {note.trim()}
+                  </span>
+                )}
+              </div>
+
+              {!note.trim() && <ChipRow />}
+
               <button
                 type="submit"
-                className="floating-submit-btn"
-                disabled={loading || !amount}
+                className="modal-submit-btn"
+                disabled={loading || !amount || parseFloat(amount) <= 0}
               >
-                {loading ? 'Adding...' : 'Add Expense'}
+                {loading ? 'Adding...' : `Add  ₹${amount || '0'} · ${getCategory()}`}
               </button>
             </form>
           </div>
         </div>
       )}
 
+      {/* Inline form */}
       <div className="quick-add-container">
-        <form onSubmit={handleSubmit} className="quick-add-form">
-          <input
-            type="number"
-            step="0.01"
-            className="quick-add-input"
-            placeholder="Enter amount..."
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            disabled={loading}
-            autoFocus
-          />
-          <button
-            type="submit"
-            className={`quick-add-btn ${loading ? 'loading' : ''}`}
-            disabled={loading || !amount}
-          >
-            {loading ? '...' : '+'}
-          </button>
-        </form>
-        
-        <div className="category-chips">
-          {categories.map((category) => (
-            <button
-              key={category}
-              type="button"
-              className={`category-chip ${selectedCategory === category ? 'active' : ''}`}
-              onClick={() => {
-                setSelectedCategory(category);
-                setShowCustomInput(false);
-              }}
-            >
-              {category}
-            </button>
-          ))}
-          
-          {/* Custom Category Input */}
-          {showCustomInput ? (
-            <div className="custom-category-input">
+        <form onSubmit={handleSubmit}>
+          <div className="quick-add-row">
+            <div className="amount-wrap">
+              <span className="amount-prefix">₹</span>
+              <input
+                type="number"
+                step="0.01"
+                className="quick-add-input"
+                placeholder="Amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                disabled={loading}
+              />
+            </div>
+            <div className="note-wrap">
               <input
                 type="text"
-                value={customCategory}
-                onChange={(e) => setCustomCategory(e.target.value)}
-                placeholder="Enter category..."
-                className="custom-input"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCustomCategorySubmit();
-                  }
-                }}
-                autoFocus
+                className="quick-note-input"
+                placeholder="Note (acts as custom tag)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                disabled={loading}
               />
-              <button
-                type="button"
-                onClick={handleCustomCategorySubmit}
-                className="custom-submit-btn"
-              >
-                ✓
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCustomInput(false);
-                  setCustomCategory('');
-                }}
-                className="custom-cancel-btn"
-              >
-                ×
-              </button>
+              {note.trim() && (
+                <span className="inline-note-tag">🏷️ {note.trim()}</span>
+              )}
             </div>
-          ) : (
             <button
-              type="button"
-              className="category-chip add-custom"
-              onClick={() => setShowCustomInput(true)}
+              type="submit"
+              className="quick-add-btn"
+              disabled={loading || !amount || parseFloat(amount) <= 0}
             >
-              + Custom
+              {loading ? '…' : '+'}
             </button>
-          )}
-        </div>
+          </div>
+
+          {/* Only show chips when note is empty */}
+          {!note.trim() && <ChipRow />}
+        </form>
       </div>
 
       <SuccessNotification
-        message="Expense added successfully!"
+        message="Expense added!"
         isVisible={showSuccess}
         onClose={() => setShowSuccess(false)}
       />

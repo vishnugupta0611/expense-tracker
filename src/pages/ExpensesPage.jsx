@@ -122,14 +122,27 @@ const ExpensesPage = () => {
     setExpenseStreak(streak);
   };
 
-  const handleExpenseAdded = () => {
-    fetchData();
+  const handleExpenseAdded = (newExpense) => {
+    if (newExpense) {
+      setExpenses(prev => [newExpense, ...prev]);
+      setTodayTotal(prev => prev + newExpense.amount);
+      setWeeklyTotal(prev => prev + newExpense.amount);
+    } else {
+      fetchData();
+    }
   };
 
   const handleDeleteExpense = async (id) => {
     try {
+      const expense = expenses.find(e => e._id === id);
       await api.delete(`/expenses/${id}`);
-      fetchData();
+      setExpenses(prev => prev.filter(e => e._id !== id));
+      if (expense) {
+        const isToday = new Date(expense.date).toDateString() === new Date().toDateString();
+        const isThisWeek = new Date(expense.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
+        if (isToday) setTodayTotal(prev => prev - expense.amount);
+        if (isThisWeek) setWeeklyTotal(prev => prev - expense.amount);
+      }
     } catch (error) {
       console.error('Failed to delete expense:', error);
     }
@@ -210,7 +223,6 @@ const ExpensesPage = () => {
               <span className="summary-label">This Week</span>
               <span className="summary-amount">₹{weeklyTotal.toFixed(0)}</span>
             </div>
-            
           </div>
 
           <BudgetProgress budgetStatus={budgetStatus} />
@@ -314,6 +326,7 @@ const ExpensesPage = () => {
                         {expense.category === 'Grocery' && '🛒'}
                         {expense.category === 'Entertainment' && '🎬'}
                         {expense.category === 'Other' && '📦'}
+                        {!['Food','Transport','Bills','Grocery','Entertainment','Other'].includes(expense.category) && '🏷️'}
                       </div>
                       <div className="expense-info">
                         <div className="expense-main-info">

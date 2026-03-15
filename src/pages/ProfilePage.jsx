@@ -7,17 +7,15 @@ import './ProfilePage.css';
 
 const ProfilePage = () => {
   const { user, login, logout } = useAuth();
-  
+
   const [name, setName] = useState(user?.name || '');
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || '');
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [monthlyBudget, setMonthlyBudget] = useState(user?.budgets?.monthly || 0);
   const [dailyBudget, setDailyBudget] = useState(user?.budgets?.daily || 0);
-  const [categoryBudgets, setCategoryBudgets] = useState(user?.budgets?.categoryBudgets || {});
   const [defaultView, setDefaultView] = useState(user?.defaultView || 'expenses');
-  
+
   const [spaces, setSpaces] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -31,28 +29,17 @@ const ProfilePage = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [categoriesRes, spacesRes, analyticsRes] = await Promise.all([
-        api.get('/categories').catch(err => ({ data: [] })), 
-        api.get('/spaces').catch(err => ({ data: { spaces: [] } })),
-        api.get('/analytics/personal').catch(() => ({ data: null }))
+      const [spacesRes, analyticsRes] = await Promise.all([
+        api.get('/spaces').catch(() => ({ data: { spaces: [] } })),
+        api.get('/analytics/personal').catch(() => ({ data: null })),
       ]);
-      
-      setCategories(categoriesRes.data || []);
       setSpaces(spacesRes.data?.spaces || spacesRes.data || []);
       setStats(analyticsRes.data);
     } catch (error) {
       console.error('Failed to fetch profile data', error);
-      setMessage({ type: 'error', text: 'Failed to load some data. Please refresh.' });
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleCategoryBudgetChange = (categoryName, value) => {
-    setCategoryBudgets(prev => ({
-      ...prev,
-      [categoryName]: Number(value)
-    }));
   };
 
   const handleAvatarSelect = (gifUrl) => {
@@ -60,9 +47,7 @@ const ProfilePage = () => {
     setShowAvatarPicker(false);
   };
 
-  const getSelectedAvatarGif = () => {
-    return avatarGifs.find(g => g.url === selectedAvatar);
-  };
+  const getSelectedAvatarGif = () => avatarGifs.find(g => g.url === selectedAvatar);
 
   const handleLogout = () => {
     logout();
@@ -73,263 +58,185 @@ const ProfilePage = () => {
     e.preventDefault();
     setSaving(true);
     setMessage({ type: '', text: '' });
-
     try {
-      const updatedUser = {
+      const response = await api.put('/users/profile', {
         name,
         defaultView,
         avatar: selectedAvatar,
         budgets: {
           monthly: Number(monthlyBudget),
           daily: Number(dailyBudget),
-          categoryBudgets
-        }
-      };
-
-      const response = await api.put('/users/profile', updatedUser);
-      
+          categoryBudgets: user?.budgets?.categoryBudgets || {},
+        },
+      });
       const token = localStorage.getItem('token');
       login(token, response.data);
-
-      setMessage({ type: 'success', text: '✓ Profile updated successfully!' });
+      setMessage({ type: 'success', text: 'Profile updated' });
       setTimeout(() => setMessage({ type: '', text: '' }), 3000);
     } catch (error) {
       console.error(error);
-      setMessage({ type: 'error', text: '✗ Failed to update profile.' });
+      setMessage({ type: 'error', text: 'Failed to update profile' });
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="profile-page"><div className="loading-spinner">Loading...</div></div>;
+  const displayUsername = user?.email
+    ? user.email.replace('@spendly.app', '')
+    : user?.email || '';
 
-  const totalCategoryBudget = Object.values(categoryBudgets).reduce((sum, val) => sum + Number(val), 0);
-  const budgetWarning = totalCategoryBudget > monthlyBudget && monthlyBudget > 0;
+  if (loading) return <div className="profile-page"><div className="profile-loading">Loading...</div></div>;
 
   return (
     <div className="profile-page">
-      <header className="page-header">
-        <h1>Profile & Settings</h1>
-      </header>
 
-      {stats && (
-        <div className="profile-stats">
-          <div className="stat-card">
-            <span className="stat-icon">💰</span>
-            <div className="stat-info">
-              <span className="stat-label">This Month</span>
-              <span className="stat-value">₹{stats.total?.toFixed(0) || 0}</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <span className="stat-icon">📊</span>
-            <div className="stat-info">
-              <span className="stat-label">Expenses</span>
-              <span className="stat-value">{stats.expenseCount || 0}</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <span className="stat-icon">🎯</span>
-            <div className="stat-info">
-              <span className="stat-label">Budget Used</span>
-              <span className="stat-value">
-                {monthlyBudget > 0 ? `${((stats.total / monthlyBudget) * 100).toFixed(0)}%` : 'N/A'}
-              </span>
-            </div>
-          </div>
+      {/* Top user card */}
+      <div className="profile-hero">
+        <div
+          className="profile-avatar"
+          onClick={() => setShowAvatarPicker(true)}
+          title="Change avatar"
+        >
+          {selectedAvatar ? (
+            <img src={selectedAvatar} alt={getSelectedAvatarGif()?.label || 'Avatar'} />
+          ) : (
+            <span className="avatar-placeholder">👤</span>
+          )}
+          <div className="avatar-edit-badge">✏️</div>
         </div>
-      )}
-
-      {/* My Schedule Link */}
-      <Link to="/schedule" className="profile-schedule-link">
-        <div className="profile-schedule-icon">📅</div>
-        <div className="profile-schedule-info">
-          <h3>My Schedule</h3>
-          <p>Plan your daily routine &amp; weekly activities</p>
+        <div className="profile-hero-info">
+          <h2>{user?.name}</h2>
+          <span className="profile-username">@{displayUsername}</span>
         </div>
-        <span className="profile-schedule-arrow">→</span>
-      </Link>
-
-      <div className="profile-content">
-        {message.text && (
-          <div className={`message ${message.type}`}>
-            {message.text}
+        {stats && (
+          <div className="profile-hero-stats">
+            <div className="hero-stat">
+              <span className="hero-stat-value">₹{stats.total?.toFixed(0) || 0}</span>
+              <span className="hero-stat-label">This month</span>
+            </div>
+            <div className="hero-stat-divider" />
+            <div className="hero-stat">
+              <span className="hero-stat-value">{stats.expenseCount || 0}</span>
+              <span className="hero-stat-label">Expenses</span>
+            </div>
           </div>
         )}
-
-        <form onSubmit={handleSubmit} className="profile-form">
-          <section className="form-section">
-            <h2>👤 Personal Info</h2>
-            
-            {/* Avatar GIF Section */}
-            <div className="form-group profile-image-section">
-              <label>Profile Avatar</label>
-              <div className="profile-image-container">
-                <div 
-                  className="profile-image-wrapper avatar-clickable"
-                  onClick={() => setShowAvatarPicker(true)}
-                  title="Click to change avatar"
-                >
-                  {selectedAvatar ? (
-                    <img 
-                      src={selectedAvatar} 
-                      alt={getSelectedAvatarGif()?.label || 'Avatar'} 
-                      className="profile-image avatar-gif"
-                    />
-                  ) : (
-                    <div className="profile-image-placeholder">
-                      <span className="placeholder-icon">👤</span>
-                    </div>
-                  )}
-                  <div className="change-avatar-overlay">
-                    <span>✏️ Change</span>
-                  </div>
-                </div>
-                <small className="help-text">Click avatar to choose a GIF</small>
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label>Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Your name"
-                required
-              />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
-                value={user?.email || ''}
-                disabled
-                className="disabled-input"
-              />
-              <small>Email cannot be changed</small>
-            </div>
-          </section>
-
-          <section className="form-section">
-            <h2>🏠 Default View</h2>
-            <div className="form-group">
-              <label>Landing Page After Login</label>
-              <select
-                value={defaultView}
-                onChange={(e) => setDefaultView(e.target.value)}
-              >
-                <option value="expenses">📝 Personal Expenses</option>
-                <option value="spaces">🏠 All Spaces</option>
-                <optgroup label="Specific Space">
-                  {spaces.map(space => (
-                    <option key={space._id} value={space._id}>
-                      🏠 {space.name}
-                    </option>
-                  ))}
-                </optgroup>
-              </select>
-            </div>
-          </section>
-
-          <section className="form-section">
-            <h2>💵 Budget Settings</h2>
-            <div className="budget-grid">
-              <div className="form-group">
-                <label>Monthly Budget</label>
-                <div className="input-with-prefix">
-                  <span className="prefix">₹</span>
-                  <input
-                    type="number"
-                    value={monthlyBudget}
-                    onChange={(e) => setMonthlyBudget(e.target.value)}
-                    min="0"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>Daily Budget</label>
-                <div className="input-with-prefix">
-                  <span className="prefix">₹</span>
-                  <input
-                    type="number"
-                    value={dailyBudget}
-                    onChange={(e) => setDailyBudget(e.target.value)}
-                    min="0"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {budgetWarning && (
-              <div className="budget-warning">
-                ⚠️ Category budgets (₹{totalCategoryBudget}) exceed monthly budget (₹{monthlyBudget})
-              </div>
-            )}
-
-            <div className="category-budgets-section">
-              <h3>Category-wise Budgets</h3>
-              <div className="category-budgets-grid">
-                {categories.length > 0 ? categories.map(cat => (
-                  <div key={cat._id} className="category-budget-item">
-                    <label>{cat.name}</label>
-                    <div className="input-with-prefix">
-                      <span className="prefix">₹</span>
-                      <input
-                        type="number"
-                        value={categoryBudgets[cat.name] || ''}
-                        onChange={(e) => handleCategoryBudgetChange(cat.name, e.target.value)}
-                        placeholder="No limit"
-                        min="0"
-                      />
-                    </div>
-                  </div>
-                )) : <p className="empty-state">No categories found.</p>}
-              </div>
-              <small className="help-text">Leave empty for no category limit</small>
-            </div>
-          </section>
-
-          <div className="form-actions">
-            <button type="submit" className="btn btn-primary btn-lg" disabled={saving}>
-              {saving ? '⏳ Saving...' : '💾 Save Changes'}
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-secondary btn-lg logout-btn" 
-              onClick={() => setShowLogoutDialog(true)}
-            >
-              🚪 Logout
-            </button>
-          </div>
-        </form>
       </div>
 
-      {/* Avatar Picker Modal */}
+      {/* Shortcuts */}
+      <Link to="/schedule" className="profile-shortcut">
+        <span className="shortcut-icon">📅</span>
+        <span className="shortcut-label">My Schedule</span>
+        <span className="shortcut-arrow">→</span>
+      </Link>
+      <Link to="/history" className="profile-shortcut">
+        <span className="shortcut-icon">📊</span>
+        <span className="shortcut-label">History</span>
+        <span className="shortcut-arrow">→</span>
+      </Link>
+
+      {message.text && (
+        <div className={`profile-message ${message.type}`}>{message.text}</div>
+      )}
+
+      <form onSubmit={handleSubmit} className="profile-form">
+
+        {/* Personal */}
+        <div className="profile-section">
+          <p className="section-label">Personal</p>
+          <div className="field-row">
+            <label>Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your name"
+              required
+            />
+          </div>
+          <div className="field-row">
+            <label>Username</label>
+            <input type="text" value={displayUsername} disabled className="field-disabled" />
+          </div>
+        </div>
+
+        {/* Preferences */}
+        <div className="profile-section">
+          <p className="section-label">Preferences</p>
+          <div className="field-row">
+            <label>Default view</label>
+            <select value={defaultView} onChange={(e) => setDefaultView(e.target.value)}>
+              <option value="expenses">Personal Expenses</option>
+              <option value="spaces">All Spaces</option>
+              {spaces.map(space => (
+                <option key={space._id} value={space._id}>{space.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Budget */}
+        <div className="profile-section">
+          <p className="section-label">Budget</p>
+          <div className="field-row">
+            <label>Monthly</label>
+            <div className="field-prefix-wrap">
+              <span>₹</span>
+              <input
+                type="number"
+                value={monthlyBudget}
+                onChange={(e) => setMonthlyBudget(e.target.value)}
+                min="0"
+                placeholder="0"
+              />
+            </div>
+          </div>
+          <div className="field-row">
+            <label>Daily</label>
+            <div className="field-prefix-wrap">
+              <span>₹</span>
+              <input
+                type="number"
+                value={dailyBudget}
+                onChange={(e) => setDailyBudget(e.target.value)}
+                min="0"
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="profile-actions">
+          <button type="submit" className="btn-save" disabled={saving}>
+            {saving ? 'Saving...' : 'Save changes'}
+          </button>
+          <button
+            type="button"
+            className="btn-logout"
+            onClick={() => setShowLogoutDialog(true)}
+          >
+            Logout
+          </button>
+        </div>
+      </form>
+
+      {/* Avatar Picker */}
       {showAvatarPicker && (
-        <div className="dialog-overlay" onClick={() => setShowAvatarPicker(false)}>
-          <div className="avatar-picker-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="avatar-picker-header">
-              <h3>Choose Your Avatar</h3>
-              <button 
-                className="avatar-picker-close"
-                onClick={() => setShowAvatarPicker(false)}
-              >
-                ✕
-              </button>
+        <div className="modal-overlay" onClick={() => setShowAvatarPicker(false)}>
+          <div className="avatar-picker" onClick={(e) => e.stopPropagation()}>
+            <div className="avatar-picker-head">
+              <span>Choose Avatar</span>
+              <button onClick={() => setShowAvatarPicker(false)}>✕</button>
             </div>
             <div className="avatar-grid">
               {avatarGifs.map((gif) => (
                 <div
                   key={gif.id}
-                  className={`avatar-grid-item ${selectedAvatar === gif.url ? 'selected' : ''}`}
+                  className={`avatar-item ${selectedAvatar === gif.url ? 'selected' : ''}`}
                   onClick={() => handleAvatarSelect(gif.url)}
                 >
                   <img src={gif.url} alt={gif.label} loading="lazy" />
-                  <span className="avatar-label">{gif.label}</span>
+                  <span>{gif.label}</span>
                 </div>
               ))}
             </div>
@@ -337,25 +244,15 @@ const ProfilePage = () => {
         </div>
       )}
 
-      {/* Logout Confirmation Dialog */}
+      {/* Logout confirm */}
       {showLogoutDialog && (
-        <div className="dialog-overlay" onClick={() => setShowLogoutDialog(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Confirm Logout</h3>
-            <p>Are you sure you want to logout? You'll need to login again to access your account.</p>
-            <div className="dialog-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => setShowLogoutDialog(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-error" 
-                onClick={handleLogout}
-              >
-                🚪 Logout
-              </button>
+        <div className="modal-overlay" onClick={() => setShowLogoutDialog(false)}>
+          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
+            <h3>Log out?</h3>
+            <p>You'll need to sign in again to access your account.</p>
+            <div className="confirm-actions">
+              <button className="btn-cancel" onClick={() => setShowLogoutDialog(false)}>Cancel</button>
+              <button className="btn-confirm-logout" onClick={handleLogout}>Log out</button>
             </div>
           </div>
         </div>

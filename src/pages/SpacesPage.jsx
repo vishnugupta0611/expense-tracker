@@ -23,10 +23,6 @@ const SpacesPage = () => {
     category: 'Other'
   });
 
-  useEffect(() => {
-    fetchSpaces();
-  }, []);
-
   const fetchSpaces = async () => {
     try {
       const response = await api.get('/spaces');
@@ -101,10 +97,18 @@ const SpacesPage = () => {
     }
   };
 
+  useEffect(() => {
+    fetchSpaces();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleCreateSpace = async (e) => {
     e.preventDefault();
     try {
-      const emails = formData.memberEmails.split(',').map(e => e.trim()).filter(e => e);
+      const emails = formData.memberEmails.split(',')
+        .map(u => u.trim().toLowerCase().replace(/\s+/g, '_'))
+        .filter(u => u)
+        .map(u => u.includes('@') ? u : `${u}@spendly.app`);
       await api.post('/spaces', {
         name: formData.name,
         memberEmails: emails,
@@ -134,7 +138,10 @@ const SpacesPage = () => {
   const handleAddMembers = async (e) => {
     e.preventDefault();
     try {
-      const emails = formData.memberEmails.split(',').map(e => e.trim()).filter(e => e);
+      const emails = formData.memberEmails.split(',')
+        .map(u => u.trim().toLowerCase().replace(/\s+/g, '_'))
+        .filter(u => u)
+        .map(u => u.includes('@') ? u : `${u}@spendly.app`);
       await api.post(`/spaces/${selectedSpace._id}/members`, { emails });
       setShowAddMemberModal(false);
       setSelectedSpace(null);
@@ -168,24 +175,6 @@ const SpacesPage = () => {
       console.error('Failed to add expense:', error);
       alert('Failed to add expense');
     }
-  };
-
-  const openEditModal = (space, e) => {
-    e.stopPropagation();
-    setSelectedSpace(space);
-    setFormData({ ...formData, name: space.name });
-    setShowEditModal(true);
-  };
-
-  const openAddMemberModal = (space, e) => {
-    e.stopPropagation();
-    setSelectedSpace(space);
-    setShowAddMemberModal(true);
-  };
-
-  const viewAnalytics = (space, e) => {
-    e.stopPropagation();
-    navigate(`/spaces/${space._id}/analytics`);
   };
 
   if (loading) {
@@ -279,7 +268,10 @@ const SpacesPage = () => {
                     <div className="card-avatars">
                       {space.members.slice(0, 4).map((member) => (
                         <div key={member._id} className="card-avatar" title={member.name}>
-                          {member.name[0]}
+                          {member.avatar
+                            ? <img src={member.avatar} alt={member.name} style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}} />
+                            : member.name[0]
+                          }
                         </div>
                       ))}
                       {space.members.length > 4 && (
@@ -312,11 +304,11 @@ const SpacesPage = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Add Members (Emails)</label>
+                <label>Add Members (Usernames)</label>
                 <textarea
                   value={formData.memberEmails}
                   onChange={(e) => setFormData({ ...formData, memberEmails: e.target.value })}
-                  placeholder="email1@example.com, email2@example.com"
+                  placeholder="username1, username2"
                   rows={3}
                 />
                 <small>Comma-separated. Only registered users can be added.</small>
@@ -381,11 +373,11 @@ const SpacesPage = () => {
             <h2>Add Members to {selectedSpace.name}</h2>
             <form onSubmit={handleAddMembers}>
               <div className="form-group">
-                <label>Member Emails</label>
+                <label>Member Usernames</label>
                 <textarea
                   value={formData.memberEmails}
                   onChange={(e) => setFormData({ ...formData, memberEmails: e.target.value })}
-                  placeholder="email1@example.com, email2@example.com"
+                  placeholder="username1, username2"
                   rows={3}
                   required
                 />

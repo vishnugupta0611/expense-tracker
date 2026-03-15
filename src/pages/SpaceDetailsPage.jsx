@@ -32,6 +32,7 @@ const SpaceDetailsPage = () => {
 
   useEffect(() => {
     fetchSpaceData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const fetchSpaceData = async () => {
@@ -81,7 +82,10 @@ const SpaceDetailsPage = () => {
   const handleAddMembers = async (e) => {
     e.preventDefault();
     try {
-      const emails = memberEmails.split(',').map(e => e.trim()).filter(e => e);
+      const emails = memberEmails.split(',')
+        .map(u => u.trim().toLowerCase().replace(/\s+/g, '_'))
+        .filter(u => u)
+        .map(u => u.includes('@') ? u : `${u}@spendly.app`);
       await api.post(`/spaces/${id}/members`, { emails });
       setShowSettings(false);
       setMemberEmails('');
@@ -380,10 +384,15 @@ const SpaceDetailsPage = () => {
                     <div className="info-members-list">
                       {space.members.map(m => (
                         <div key={m._id} className="info-member">
-                          <div className="info-member-avatar">{m.name[0]}</div>
+                          <div className="info-member-avatar">
+                            {m.avatar
+                              ? <img src={m.avatar} alt={m.name} style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}} />
+                              : m.name[0]
+                            }
+                          </div>
                           <div className="info-member-details">
                             <span className="info-member-name">{m.name}</span>
-                            <span className="info-member-email">{m.email}</span>
+                            <span className="info-member-email">{m.email?.replace('@spendly.app','')}</span>
                           </div>
                         </div>
                       ))}
@@ -406,11 +415,11 @@ const SpaceDetailsPage = () => {
               )}
               {settingsTab === 'members' && (
                 <form onSubmit={handleAddMembers} className="settings-form">
-                  <label>Add Members by Email</label>
+                  <label>Add Members by Username</label>
                   <textarea
                     value={memberEmails}
                     onChange={(e) => setMemberEmails(e.target.value)}
-                    placeholder="Enter emails (comma-separated)"
+                    placeholder="username1, username2"
                     rows={3}
                     required
                   />
@@ -451,7 +460,10 @@ const SpaceDetailsPage = () => {
             <div className="members-avatars-compact">
                 {space.members.map(member => (
                     <div key={member._id} className="member-avatar-sm" title={member.name}>
-                        {member.name[0]}
+                        {member.avatar
+                          ? <img src={member.avatar} alt={member.name} style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}} />
+                          : member.name[0]
+                        }
                     </div>
                 ))}
             </div>

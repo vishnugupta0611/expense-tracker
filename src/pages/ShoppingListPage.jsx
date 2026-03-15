@@ -121,19 +121,15 @@ const ShoppingListPage = () => {
       <div className="shopping-header">
         <div className="header-content">
           <h1>🛍️ Shopping List</h1>
-          <p className="header-subtitle">Keep track of what you need to buy</p>
-          
           {totalCount > 0 && (
             <div className="progress-section">
               <div className="progress-bar">
-                <div 
-                  className="progress-fill" 
+                <div
+                  className="progress-fill"
                   style={{ width: `${(completedCount / totalCount) * 100}%` }}
                 ></div>
               </div>
-              <span className="progress-text">
-                {completedCount} of {totalCount} items completed
-              </span>
+              <span className="progress-text">{completedCount}/{totalCount}</span>
             </div>
           )}
         </div>
@@ -239,7 +235,7 @@ const ShoppingListPage = () => {
                               className="delete-btn"
                               title="Delete item"
                             >
-                              🗑️
+                              ×
                             </button>
                           </div>
                         ))}

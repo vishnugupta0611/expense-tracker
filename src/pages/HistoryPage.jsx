@@ -1,54 +1,47 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import api from '@services/api';
 import './HistoryPage.css';
+
+const CATEGORY_EMOJI = {
+  Food: '🍕', Transport: '🚗', Bills: '💡',
+  Grocery: '🛒', Entertainment: '🎬', Other: '📦'
+};
 
 const HistoryPage = () => {
   const [expenses, setExpenses] = useState([]);
   const [spaces, setSpaces] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Filter states
-  const [expenseType, setExpenseType] = useState('personal'); // 'personal' or 'space'
+  const [expenseType, setExpenseType] = useState('personal');
   const [selectedSpace, setSelectedSpace] = useState('');
-  const [timeFilter, setTimeFilter] = useState('day'); // 'day', 'month', 'year'
+  const [timeFilter, setTimeFilter] = useState('day');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [dateRange, setDateRange] = useState({
-    start: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-    end: new Date().toISOString().split('T')[0]
-  });
+  const [startDate, setStartDate] = useState(
+    new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]
+  );
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('date'); // 'date', 'amount', 'category'
-  const [sortOrder, setSortOrder] = useState('desc'); // 'asc', 'desc'
+  const [sortBy, setSortBy] = useState('date');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   const categories = ['Food', 'Transport', 'Bills', 'Grocery', 'Entertainment', 'Other'];
 
-  useEffect(() => {
-    fetchData();
-  }, [expenseType, selectedSpace, timeFilter, dateRange]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      
+      // Append end of day to endDate so today's expenses are included
+      const endOfDay = `${endDate}T23:59:59`;
       if (expenseType === 'personal') {
         const response = await api.get('/expenses', {
-          params: {
-            startDate: dateRange.start,
-            endDate: dateRange.end
-          }
+          params: { startDate, endDate: endOfDay }
         });
         setExpenses(response.data.expenses || []);
       } else {
-        // Fetch spaces first
         const spacesRes = await api.get('/spaces');
-        setSpaces(spacesRes.data.spaces || []);
-        
+        setSpaces(spacesRes.data.spaces || spacesRes.data || []);
         if (selectedSpace) {
           const response = await api.get(`/spaces/${selectedSpace}/expenses`, {
-            params: {
-              startDate: dateRange.start,
-              endDate: dateRange.end
-            }
+            params: { startDate, endDate: endOfDay }
           });
           setExpenses(response.data.expenses || []);
         } else {
@@ -57,10 +50,15 @@ const HistoryPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch history:', error);
+      setExpenses([]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [expenseType, selectedSpace, startDate, endDate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const getFilteredExpenses = () => {
     let filtered = [...expenses];
@@ -154,31 +152,27 @@ const HistoryPage = () => {
   const getQuickDateRange = (period) => {
     const today = new Date();
     let start;
-    
     switch (period) {
       case 'today':
-        start = new Date(today);
+        start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         break;
       case 'week':
-        start = new Date(today.setDate(today.getDate() - 7));
+        start = new Date(new Date().setDate(today.getDate() - 7));
         break;
       case 'month':
-        start = new Date(today.setMonth(today.getMonth() - 1));
+        start = new Date(new Date().setMonth(today.getMonth() - 1));
         break;
       case '3months':
-        start = new Date(today.setMonth(today.getMonth() - 3));
+        start = new Date(new Date().setMonth(today.getMonth() - 3));
         break;
       case 'year':
-        start = new Date(today.setFullYear(today.getFullYear() - 1));
+        start = new Date(new Date().setFullYear(today.getFullYear() - 1));
         break;
       default:
         return;
     }
-    
-    setDateRange({
-      start: start.toISOString().split('T')[0],
-      end: new Date().toISOString().split('T')[0]
-    });
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(new Date().toISOString().split('T')[0]);
   };
 
   if (loading) {
@@ -207,7 +201,7 @@ const HistoryPage = () => {
         {/* Quick Date Filters */}
         <div className="quick-filters">
           <button 
-            className={`quick-filter-btn ${dateRange.start === new Date().toISOString().split('T')[0] ? 'active' : ''}`}
+            className={`quick-filter-btn ${startDate === new Date().toISOString().split('T')[0] ? 'active' : ''}`}
             onClick={() => getQuickDateRange('today')}
           >
             Today
@@ -295,8 +289,8 @@ const HistoryPage = () => {
               <label>From</label>
               <input 
                 type="date" 
-                value={dateRange.start}
-                onChange={(e) => setDateRange({...dateRange, start: e.target.value})}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
 
@@ -304,8 +298,8 @@ const HistoryPage = () => {
               <label>To</label>
               <input 
                 type="date" 
-                value={dateRange.end}
-                onChange={(e) => setDateRange({...dateRange, end: e.target.value})}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
 
@@ -362,12 +356,7 @@ const HistoryPage = () => {
                   <div key={expense._id} className="expense-card">
                     <div className="expense-main">
                       <div className="expense-icon">
-                        {expense.category === 'Food' && '🍕'}
-                        {expense.category === 'Transport' && '🚗'}
-                        {expense.category === 'Bills' && '💡'}
-                        {expense.category === 'Grocery' && '🛒'}
-                        {expense.category === 'Entertainment' && '🎬'}
-                        {expense.category === 'Other' && '📦'}
+                        {CATEGORY_EMOJI[expense.category] || '�️'}
                       </div>
                       
                       <div className="expense-details">
