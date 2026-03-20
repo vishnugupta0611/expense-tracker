@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@context/AuthContext';
+import { TodoProvider } from '@context/TodoContext';
 import BottomNav from '@components/navigation/BottomNav';
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
@@ -12,6 +13,7 @@ import SpaceAnalyticsPage from './pages/SpaceAnalyticsPage';
 import ShoppingListPage from './pages/ShoppingListPage';
 import HistoryPage from './pages/HistoryPage';
 import SchedulePage from './pages/SchedulePage';
+import TodoPage from './pages/TodoPage';
 import InstallPrompt from './components/InstallPrompt';
 import './styles/global.css';
 import './App.css';
@@ -62,6 +64,7 @@ const AppContent = () => {
         <Route path="/shopping" element={<ProtectedRoute><ShoppingListPage /></ProtectedRoute>} />
         <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
         <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
+        <Route path="/todo" element={<ProtectedRoute><TodoPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -76,7 +79,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppContent />
+        <TodoProvider>
+          <AppContent />
+        </TodoProvider>
       </AuthProvider>
     </Router>
   );

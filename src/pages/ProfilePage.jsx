@@ -129,6 +129,11 @@ const ProfilePage = () => {
         <span className="shortcut-label">My Schedule</span>
         <span className="shortcut-arrow">→</span>
       </Link>
+      <Link to="/todo" className="profile-shortcut">
+        <span className="shortcut-icon">✅</span>
+        <span className="shortcut-label">My Todos</span>
+        <span className="shortcut-arrow">→</span>
+      </Link>
       <Link to="/history" className="profile-shortcut">
         <span className="shortcut-icon">📊</span>
         <span className="shortcut-label">History</span>

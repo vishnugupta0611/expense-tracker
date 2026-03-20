@@ -1423,3 +1423,110 @@
     padding-bottom: env(safe-area-inset-bottom);
   }
 }
+
+/* ── Today's Todos Widget (in SchedulePage) ── */
+.schedule-todo-widget {
+  margin: 1rem 1rem 0;
+  background: var(--card-bg);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 1rem 1.1rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.stw-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.stw-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stw-link {
+  font-size: 0.78rem;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.stw-link:hover { text-decoration: underline; }
+
+.stw-empty {
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.stw-empty a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.stw-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.stw-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.6rem;
+  border-left: 3px solid;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--bg-secondary);
+  transition: opacity var(--transition-fast);
+}
+
+.stw-item.done { opacity: 0.5; }
+.stw-item.done .stw-item-title { text-decoration: line-through; }
+
+.stw-check {
+  width: 18px;
+  height: 18px;
+  border: 2px solid;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.stw-check:hover { opacity: 0.7; }
+
+.stw-item-title {
+  flex: 1;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stw-item-time {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.stw-more {
+  font-size: 0.78rem;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+}

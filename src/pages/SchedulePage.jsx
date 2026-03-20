@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import scheduleService from '@services/scheduleService';
+import { useTodos, getCardColor } from '@context/TodoContext';
 import './SchedulePage.css';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -248,6 +249,13 @@ const SchedulePage = () => {
     }));
   };
 
+  const { todos, toggleTodo } = useTodos();
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayTodos = useMemo(() =>
+    todos.filter(t => t.date === todayStr),
+    [todos, todayStr]
+  );
+
   // Today's date display
   const todayDisplay = new Date().toLocaleDateString('en-IN', {
     weekday: 'long',
@@ -395,6 +403,45 @@ const SchedulePage = () => {
           )}
         </div>
       )}
+
+      {/* Today's Todos widget */}
+      <div className="schedule-todo-widget">
+        <div className="stw-header">
+          <span className="stw-title">✅ Today's Todos</span>
+          <Link to="/todo" className="stw-link">View all →</Link>
+        </div>
+        {todayTodos.length === 0 ? (
+          <p className="stw-empty">No todos for today. <Link to="/todo">Add one →</Link></p>
+        ) : (
+          <div className="stw-list">
+            {todayTodos.slice(0, 5).map(todo => {
+              const color = getCardColor(todo.id);
+              return (
+                <div
+                  key={todo.id}
+                  className={`stw-item ${todo.status === 'completed' ? 'done' : ''}`}
+                  style={{ borderLeftColor: color.border }}
+                >
+                  <button
+                    className="stw-check"
+                    onClick={() => toggleTodo(todo.id)}
+                    style={{ borderColor: color.border, color: color.text }}
+                  >
+                    {todo.status === 'completed' ? '✓' : ''}
+                  </button>
+                  <span className="stw-item-title">{todo.title}</span>
+                  {todo.startTime && (
+                    <span className="stw-item-time">{todo.startTime}</span>
+                  )}
+                </div>
+              );
+            })}
+            {todayTodos.length > 5 && (
+              <Link to="/todo" className="stw-more">+{todayTodos.length - 5} more</Link>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* FAB */}
       <button className="schedule-fab" onClick={openAdd} title="Add Event">
