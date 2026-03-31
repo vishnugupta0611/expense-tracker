@@ -5,7 +5,7 @@ const BottomNav = () => {
   const location = useLocation();
 
   // Hide bottom nav on full-screen pages
-  const hidden = location.pathname.startsWith('/notes') || location.pathname.startsWith('/p/notes');
+  const hidden = location.pathname.startsWith('/notes') || location.pathname.startsWith('/p/notes') || location.pathname.startsWith('/words');
   if (hidden) return null;
 
   const navItems = [

@@ -1,0 +1,381 @@
+/* ── Page ── */
+.wl-page {
+  min-height: 100vh;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ── */
+.wl-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-light);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.wl-back {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.wl-back:hover { border-color: var(--primary); color: var(--primary); }
+
+.wl-title {
+  flex: 1;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.wl-add-btn {
+  padding: 0.45rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+.wl-add-btn:hover { background: var(--primary-dark); transform: translateY(-1px); }
+
+/* ── Add form slide-down ── */
+.wl-add-form-wrap {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.wl-add-form-wrap.open { max-height: 220px; }
+
+.wl-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.wl-input {
+  padding: 0.6rem 0.875rem;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  width: 100%;
+  box-sizing: border-box;
+}
+.wl-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+
+.wl-add-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.wl-cancel-btn {
+  padding: 0.45rem 0.875rem;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.wl-cancel-btn:hover { border-color: var(--error); color: var(--error); }
+
+.wl-save-btn {
+  padding: 0.45rem 1rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.wl-save-btn:hover:not(:disabled) { background: var(--primary-dark); }
+.wl-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Loading / Empty ── */
+.wl-loading {
+  display: flex;
+  justify-content: center;
+  padding: 4rem;
+}
+
+.wl-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 5rem 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 0.9rem;
+}
+.wl-empty span { font-size: 2.5rem; }
+
+/* ── Bento grid ── */
+.wl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.875rem;
+  padding: 1.25rem;
+  align-items: start; /* so expanded card doesn't stretch others */
+}
+
+/* ── Card ── */
+.wl-card {
+  background: var(--card-bg);
+  border: 1.5px solid var(--border-light);
+  border-radius: var(--radius-xl);
+  padding: 1rem;
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+  animation: wlCardIn 0.2s ease-out;
+  position: relative;
+}
+
+@keyframes wlCardIn {
+  from { opacity: 0; transform: translateY(6px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wl-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+/* Expanded card takes full row width */
+.wl-card.expanded {
+  grid-column: 1 / -1;
+  cursor: default;
+  border-color: var(--primary);
+  box-shadow: var(--shadow-lg);
+  transform: none;
+}
+
+.wl-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.wl-word {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.wl-delete-btn {
+  background: none;
+  border: none;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  padding: 0.1rem 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+  line-height: 1;
+}
+.wl-delete-btn:hover { color: var(--error); }
+
+.wl-definition {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Expanded body ── */
+.wl-expanded-body {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-light);
+  animation: wlExpand 0.2s ease-out;
+}
+
+@keyframes wlExpand {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── AI button ── */
+.wl-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 1rem;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  border: none;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 1rem;
+  letter-spacing: 0.02em;
+}
+.wl-ai-btn:hover:not(:disabled) { opacity: 0.88; transform: translateY(-1px); }
+.wl-ai-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.wl-ai-btn.done { background: linear-gradient(135deg, #10b981, #059669); }
+
+/* ── AI result ── */
+.wl-ai-result {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  animation: wlExpand 0.22s ease-out;
+}
+
+.wl-hindi {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--primary-light);
+  border-radius: var(--radius-lg);
+  padding: 0.6rem 0.875rem;
+}
+
+.wl-hindi-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+.wl-hindi-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.wl-sentences {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wl-sentence {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-md);
+  border-left: 3px solid;
+}
+
+.wl-sentence-easy   { background: rgba(16,185,129,0.07);  border-color: #10b981; }
+.wl-sentence-medium { background: rgba(245,158,11,0.07);  border-color: #f59e0b; }
+.wl-sentence-hard   { background: rgba(239,68,68,0.07);   border-color: #ef4444; }
+
+.wl-sentence-level {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+  min-width: 44px;
+}
+
+.wl-sentence-easy   .wl-sentence-level { color: #10b981; }
+.wl-sentence-medium .wl-sentence-level { color: #f59e0b; }
+.wl-sentence-hard   .wl-sentence-level { color: #ef4444; }
+
+.wl-sentence-text {
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  line-height: 1.5;
+}
+
+.wl-ai-error {
+  font-size: 0.8rem;
+  color: var(--error);
+  margin: 0;
+}
+
+/* ── Mobile ── */
+@media (max-width: 480px) {
+  .wl-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.625rem;
+    padding: 0.875rem;
+  }
+  .wl-card.expanded { grid-column: 1 / -1; }
+  .wl-header { padding: 0.75rem 1rem; }
+}
+
+/* ── Definition input row with AI button ── */
+.wl-def-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.wl-def-input { flex: 1; }
+
+.wl-def-ai-btn {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  line-height: 1;
+}
+
+.wl-def-ai-btn:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: scale(1.08);
+}
+
+.wl-def-ai-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.wl-def-ai-btn.loading {
+  animation: wlSpin 0.8s linear infinite;
+}
+
+@keyframes wlSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

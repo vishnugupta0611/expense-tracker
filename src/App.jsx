@@ -18,6 +18,7 @@ import NotesPage from './pages/NotesPage';
 import NoteEditorPage from './pages/NoteEditorPage';
 import NotePublicPage from './pages/NotePublicPage';
 import DrivePage from './pages/DrivePage';
+import WordLibraryPage from './pages/WordLibraryPage';
 import InstallPrompt from './components/InstallPrompt';
 import './styles/global.css';
 import './App.css';
@@ -74,6 +75,7 @@ const AppContent = () => {
         {/* Public note — no auth */}
         <Route path="/p/notes/:id" element={<NotePublicPage />} />
         <Route path="/drive" element={<ProtectedRoute><DrivePage /></ProtectedRoute>} />
+        <Route path="/words" element={<ProtectedRoute><WordLibraryPage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
