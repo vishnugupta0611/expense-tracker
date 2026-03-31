@@ -119,24 +119,57 @@ const DrivePage = () => {
   const uploadFiles = async (targetFolderId) => {
     setShowFolderPicker(false);
     setUploading(true);
+
+    // Get signature once for all files
+    let sigData = null;
+    try {
+      const sigRes = await api.get('/drive/upload-signature');
+      sigData = sigRes.data;
+    } catch {
+      alert('Failed to get upload credentials');
+      setUploading(false);
+      return;
+    }
+
     for (let i = 0; i < pendingFiles.length; i++) {
       const file = pendingFiles[i];
       setUploadProgress(`Uploading ${i + 1}/${pendingFiles.length}: ${file.name}`);
       try {
-        const base64 = await toBase64(file);
-        const r = await api.post('/drive/upload', {
-          base64,
-          mimeType: file.type || 'application/octet-stream',
+        // Determine resource type
+        let resourceType = 'raw';
+        if (file.type.startsWith('image/')) resourceType = 'image';
+        else if (file.type.startsWith('video/')) resourceType = 'video';
+
+        // Direct browser → Cloudinary upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('api_key', sigData.apiKey);
+        formData.append('timestamp', sigData.timestamp);
+        formData.append('signature', sigData.signature);
+        formData.append('folder', sigData.folder);
+
+        const uploadRes = await fetch(
+          `https://api.cloudinary.com/v1_1/${sigData.cloudName}/${resourceType}/upload`,
+          { method: 'POST', body: formData }
+        );
+        const data = await uploadRes.json();
+        if (!data.secure_url) throw new Error(data.error?.message || 'Upload failed');
+
+        // Save metadata to our backend
+        const r = await api.post('/drive/save-file', {
           name: file.name,
+          url: data.secure_url,
+          publicId: data.public_id,
+          mimeType: file.type || 'application/octet-stream',
+          size: data.bytes || file.size,
           parentId: targetFolderId || null,
-          size: file.size,
         });
         if (!targetFolderId || targetFolderId === currentFolder) {
           setItems(prev => [r.data.item, ...prev]);
         }
       } catch (err) {
         console.error('Upload failed:', file.name, err);
-        alert(`Failed to upload ${file.name}`);
+        alert(`Failed to upload ${file.name}: ${err.message}`);
       }
     }
     setPendingFiles([]);
@@ -144,13 +177,6 @@ const DrivePage = () => {
     setUploadProgress('');
     fetchItems(currentFolder);
   };
-
-  const toBase64 = (file) => new Promise((res, rej) => {
-    const reader = new FileReader();
-    reader.onload = () => res(reader.result.split(',')[1]);
-    reader.onerror = rej;
-    reader.readAsDataURL(file);
-  });
 
   // ── Create folder ────────────────────────────────────────────────────────────
   const createFolder = async () => {

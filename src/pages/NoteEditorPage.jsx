@@ -4,14 +4,23 @@ import api from '@services/api';
 import { useNotesTheme } from '@hooks/useNotesTheme';
 import './NoteEditorPage.css';
 
-// Pure helpers — outside component
-const blocksToHtml = (blocks) => blocks.map(b => {
-  if (b.type === 'image') return `<img src="${b.content}" class="note-img" />`;
-  if (b.type === 'h1') return `<h1>${b.content}</h1>`;
-  if (b.type === 'h2') return `<h2>${b.content}</h2>`;
-  return `<p>${b.content || '<br>'}</p>`;
-}).join('');
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
+const DRAFT_KEY = (id) => `note_draft_${id}`;
+const SYNC_EVERY = 300; // sync to backend every 300 chars typed since last sync
+
+// blocks → HTML for the editor div
+const blocksToHtml = (blocks) => {
+  if (!blocks?.length) return '<p><br></p>';
+  return blocks.map(b => {
+    if (b.type === 'image') return `<img src="${b.content}" class="note-img" data-saved="1" />`;
+    if (b.type === 'h1') return `<h1>${b.content}</h1>`;
+    if (b.type === 'h2') return `<h2>${b.content}</h2>`;
+    return `<p>${b.content || '<br>'}</p>`;
+  }).join('');
+};
+
+// editor div → blocks array (clean, no browser junk)
 const htmlToBlocks = (el) => {
   const blocks = [];
   el.childNodes.forEach(node => {
@@ -22,17 +31,47 @@ const htmlToBlocks = (el) => {
     }
     const tag = node.tagName?.toLowerCase();
     if (tag === 'img') {
-      blocks.push({ type: 'image', content: node.src });
+      const src = node.getAttribute('src') || node.src;
+      // Skip blob: URLs (upload still in progress) and placeholder images
+      if (src && !src.startsWith('blob:') && !node.getAttribute('data-placeholder')) {
+        blocks.push({ type: 'image', content: src });
+      }
     } else if (tag === 'h1') {
-      blocks.push({ type: 'h1', content: node.innerHTML });
+      const c = node.innerHTML.trim();
+      if (c) blocks.push({ type: 'h1', content: c });
     } else if (tag === 'h2') {
-      blocks.push({ type: 'h2', content: node.innerHTML });
+      const c = node.innerHTML.trim();
+      if (c) blocks.push({ type: 'h2', content: c });
     } else {
-      blocks.push({ type: 'text', content: node.innerHTML || '' });
+      const c = node.innerHTML;
+      // keep non-empty paragraphs (even just <br>)
+      if (c && c !== '<br>' || node.textContent.trim()) {
+        blocks.push({ type: 'text', content: c || '' });
+      }
     }
   });
   return blocks;
 };
+
+const saveDraft = (id, title, el) => {
+  try {
+    const blocks = htmlToBlocks(el);
+    localStorage.setItem(DRAFT_KEY(id), JSON.stringify({ title, blocks, ts: Date.now() }));
+  } catch { /* storage full */ }
+};
+
+const loadDraft = (id) => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY(id));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+};
+
+const clearDraft = (id) => {
+  try { localStorage.removeItem(DRAFT_KEY(id)); } catch { /* ignore */ }
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const NoteEditorPage = () => {
   const { id } = useParams();
@@ -41,53 +80,116 @@ const NoteEditorPage = () => {
   const fileInputRef = useRef(null);
   const saveTimer = useRef(null);
   const toolbarRef = useRef(null);
+  const titleRef = useRef('Untitled');
+  const charsSinceSync = useRef(0);
+  const isSyncing = useRef(false);
 
   const [title, setTitle] = useState('Untitled');
   const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState('saved');
+  const [saveStatus, setSaveStatus] = useState('saved'); // saved | unsaved | saving | uploading
   const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
   const { dark, toggle: toggleTheme } = useNotesTheme();
 
-  const titleRef = useRef(title);
-
-  // Load note
+  // ── Load: backend first, fall back to draft ──────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     api.get(`/notes/${id}`)
       .then(r => {
+        if (cancelled) return;
         const note = r.data.note;
-        const t = note.title || 'Untitled';
-        setTitle(t);
+        const draft = loadDraft(id);
+
+        // Use draft if it's newer than the server version
+        const serverTs = new Date(note.updatedAt).getTime();
+        const useDraft = draft && draft.ts > serverTs && draft.blocks?.length;
+
+        const t = useDraft ? draft.title : (note.title || 'Untitled');
+        const html = blocksToHtml(useDraft ? draft.blocks : note.blocks);
+
         titleRef.current = t;
-        if (editorRef.current) {
-          editorRef.current.innerHTML = note.blocks?.length
-            ? blocksToHtml(note.blocks)
-            : '<p><br></p>';
-        }
+        setTitle(t);
+        setLoading(false);
+
+        // Set editor content after render (requestAnimationFrame ensures DOM is ready)
+        requestAnimationFrame(() => {
+          if (editorRef.current && !cancelled) {
+            editorRef.current.innerHTML = html;
+          }
+        });
       })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      .catch(err => {
+        if (cancelled) return;
+        console.error('Load failed', err);
+        // Try draft as fallback
+        const draft = loadDraft(id);
+        if (draft) {
+          titleRef.current = draft.title;
+          setTitle(draft.title);
+          requestAnimationFrame(() => {
+            if (editorRef.current) editorRef.current.innerHTML = blocksToHtml(draft.blocks);
+          });
+        }
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [id]);
 
-  // Auto-save — always reads from refs so no stale closure
+  // ── Sync to backend ──────────────────────────────────────────────────────────
+  const syncToBackend = useCallback(async () => {
+    if (!editorRef.current || isSyncing.current) return;
+    isSyncing.current = true;
+    setSaveStatus('saving');
+    try {
+      const blocks = htmlToBlocks(editorRef.current);
+      await api.put(`/notes/${id}`, { title: titleRef.current, blocks });
+      charsSinceSync.current = 0;
+      clearDraft(id);
+      setSaveStatus('saved');
+    } catch (e) {
+      console.error('Sync failed', e);
+      setSaveStatus('unsaved');
+    } finally {
+      isSyncing.current = false;
+    }
+  }, [id]);
+
+  // ── Schedule save: localStorage immediately, backend debounced ───────────────
   const scheduleSave = useCallback(() => {
     setSaveStatus('unsaved');
+    // Always save to localStorage immediately
+    if (editorRef.current) saveDraft(id, titleRef.current, editorRef.current);
+
+    charsSinceSync.current += 1;
+
+    // Sync to backend: either after SYNC_EVERY chars or after 2s idle
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      if (!editorRef.current) return;
-      setSaveStatus('saving');
-      try {
-        await api.put(`/notes/${id}`, {
+    if (charsSinceSync.current >= SYNC_EVERY) {
+      syncToBackend();
+    } else {
+      saveTimer.current = setTimeout(syncToBackend, 2000);
+    }
+  }, [id, syncToBackend]);
+
+  // ── Save on page unload ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleUnload = () => {
+      if (editorRef.current) saveDraft(id, titleRef.current, editorRef.current);
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      clearTimeout(saveTimer.current);
+      // Final sync on unmount — capture ref value now
+      const el = editorRef.current;
+      if (el) {
+        api.put(`/notes/${id}`, {
           title: titleRef.current,
-          blocks: htmlToBlocks(editorRef.current),
-        });
-        setSaveStatus('saved');
-      } catch (e) {
-        console.error('Save failed', e);
-        setSaveStatus('unsaved');
+          blocks: htmlToBlocks(el),
+        }).catch(() => {});
       }
-    }, 1000);
-  }, [id]);
+    };
+  }, [id, syncToBackend]);
 
   const handleEditorInput = () => scheduleSave();
 
@@ -97,7 +199,7 @@ const NoteEditorPage = () => {
     scheduleSave();
   };
 
-  // Floating toolbar on selection
+  // ── Floating format toolbar ───────────────────────────────────────────────────
   const handleSelectionChange = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
@@ -117,7 +219,6 @@ const NoteEditorPage = () => {
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [handleSelectionChange]);
 
-  // Apply H1 / H2 / P to the block containing the selection
   const applyFormat = (tag) => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed) return;
@@ -132,58 +233,93 @@ const NoteEditorPage = () => {
     scheduleSave();
   };
 
-  // Image upload
+  // ── Image upload — show placeholder instantly, upload in background ───────────
   const triggerImageUpload = () => fileInputRef.current?.click();
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
+
+    // 1. Show local blob preview instantly — user sees image immediately
+    const localUrl = URL.createObjectURL(file);
+    const placeholderImg = insertImageAtCursor(localUrl, true);
+    setSaveStatus('uploading');
+
     try {
-      const base64 = await new Promise((res, rej) => {
-        const reader = new FileReader();
-        reader.onload = () => res(reader.result.split(',')[1]);
-        reader.onerror = rej;
-        reader.readAsDataURL(file);
-      });
-      const r = await api.post('/notes/upload-image', { base64, mimeType: file.type });
-      insertImageAtCursor(r.data.url);
+      // 2. Get upload signature from backend (tiny request, ~50ms)
+      const sigRes = await api.get('/notes/upload-signature');
+      const { timestamp, signature, apiKey, cloudName, folder } = sigRes.data;
+
+      // 3. Upload directly from browser to Cloudinary (no backend relay)
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+
+      const uploadRes = await fetch(
+        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: 'POST', body: formData }
+      );
+      const data = await uploadRes.json();
+
+      if (!data.secure_url) {
+        throw new Error(data.error?.message || 'Upload failed');
+      }
+
+      // 4. Swap placeholder with real Cloudinary URL
+      if (placeholderImg && editorRef.current?.contains(placeholderImg)) {
+        placeholderImg.src = data.secure_url;
+        placeholderImg.style.opacity = '1';
+        placeholderImg.removeAttribute('data-placeholder');
+      }
+      URL.revokeObjectURL(localUrl);
+      scheduleSave();
     } catch (err) {
       console.error('Upload failed', err);
-      alert('Image upload failed. Check Cloudinary config in backend .env');
+      if (placeholderImg && editorRef.current?.contains(placeholderImg)) {
+        placeholderImg.remove();
+      }
+      URL.revokeObjectURL(localUrl);
+      setSaveStatus('unsaved');
+      alert(`Image upload failed: ${err.message}`);
     }
   };
 
-  const insertImageAtCursor = (url) => {
+  // Returns the inserted img element so we can update its src later
+  const insertImageAtCursor = (url, isPlaceholder = false) => {
     editorRef.current?.focus();
     const sel = window.getSelection();
     const img = document.createElement('img');
     img.src = url;
     img.className = 'note-img';
+    if (isPlaceholder) {
+      img.setAttribute('data-placeholder', '1');
+      img.style.opacity = '0.5';
+    }
     const p = document.createElement('p');
     p.innerHTML = '<br>';
 
-    // Find the block-level node at cursor
     let anchorNode = sel?.anchorNode;
     while (anchorNode && anchorNode.parentNode !== editorRef.current) {
       anchorNode = anchorNode.parentNode;
     }
-
     if (anchorNode && anchorNode !== editorRef.current) {
       anchorNode.after(img, p);
     } else {
-      editorRef.current.appendChild(img);
-      editorRef.current.appendChild(p);
+      editorRef.current?.appendChild(img);
+      editorRef.current?.appendChild(p);
     }
 
-    // Move cursor to new paragraph
     const range = document.createRange();
     range.setStart(p, 0);
     range.collapse(true);
     sel?.removeAllRanges();
     sel?.addRange(range);
 
-    scheduleSave();
+    return img;
   };
 
   const handleKeyDown = (e) => {
@@ -201,14 +337,25 @@ const NoteEditorPage = () => {
     });
   };
 
-  if (loading) return <div className={`note-editor-page ${dark ? 'dark' : ''}`}><div className="note-editor-loading"><div className="spinner" /></div></div>;
+  const statusLabel = {
+    saved: '✓',
+    unsaved: '●',
+    saving: '⏳',
+    uploading: '⬆',
+  }[saveStatus] || '✓';
+
+  if (loading) return (
+    <div className={`note-editor-page ${dark ? 'dark' : ''}`}>
+      <div className="note-editor-loading"><div className="spinner" /></div>
+    </div>
+  );
 
   return (
     <div className={`note-editor-page ${dark ? 'dark' : ''}`} onClick={() => setToolbar(t => ({ ...t, visible: false }))}>
       <header className="note-editor-header" onClick={e => e.stopPropagation()}>
         <button className="note-back-btn" onClick={() => navigate('/notes')}>← Notes</button>
         <div className="note-editor-actions">
-          <button className="note-img-upload-btn" onClick={triggerImageUpload} title="Insert image at cursor">
+          <button className="note-img-upload-btn" onClick={triggerImageUpload} title="Insert image">
             🖼 <span className="btn-label">Image</span>
           </button>
           <button className="note-share-btn" onClick={copyShareLink} title="Copy public link">
@@ -217,9 +364,7 @@ const NoteEditorPage = () => {
           <button className="note-theme-btn" onClick={toggleTheme} title="Toggle theme">
             {dark ? '☀️' : '🌙'}
           </button>
-          <span className="note-save-status">
-            {saveStatus === 'saving' ? '⏳' : saveStatus === 'unsaved' ? '●' : '✓'}
-          </span>
+          <span className="note-save-status" title={saveStatus}>{statusLabel}</span>
         </div>
       </header>
 
@@ -251,7 +396,7 @@ const NoteEditorPage = () => {
         >
           <button onClick={() => applyFormat('h1')}>H1</button>
           <button onClick={() => applyFormat('h2')}>H2</button>
-          <button onClick={() => applyFormat('p')}>¶ Para</button>
+          <button onClick={() => applyFormat('p')}>¶</button>
         </div>
       )}
 
