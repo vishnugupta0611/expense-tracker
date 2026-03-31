@@ -14,6 +14,10 @@ import ShoppingListPage from './pages/ShoppingListPage';
 import HistoryPage from './pages/HistoryPage';
 import SchedulePage from './pages/SchedulePage';
 import TodoPage from './pages/TodoPage';
+import NotesPage from './pages/NotesPage';
+import NoteEditorPage from './pages/NoteEditorPage';
+import NotePublicPage from './pages/NotePublicPage';
+import DrivePage from './pages/DrivePage';
 import InstallPrompt from './components/InstallPrompt';
 import './styles/global.css';
 import './App.css';
@@ -65,6 +69,11 @@ const AppContent = () => {
         <Route path="/history" element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
         <Route path="/schedule" element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
         <Route path="/todo" element={<ProtectedRoute><TodoPage /></ProtectedRoute>} />
+        <Route path="/notes" element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
+        <Route path="/notes/:id" element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
+        {/* Public note — no auth */}
+        <Route path="/p/notes/:id" element={<NotePublicPage />} />
+        <Route path="/drive" element={<ProtectedRoute><DrivePage /></ProtectedRoute>} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />

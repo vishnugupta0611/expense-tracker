@@ -4,6 +4,10 @@ import './BottomNav.css';
 const BottomNav = () => {
   const location = useLocation();
 
+  // Hide bottom nav on full-screen pages
+  const hidden = location.pathname.startsWith('/notes') || location.pathname.startsWith('/p/notes');
+  if (hidden) return null;
+
   const navItems = [
     { path: '/expenses', icon: '💰', label: 'Expenses' },
     { path: '/spaces', icon: '👥', label: 'Spaces' },

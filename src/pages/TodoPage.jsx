@@ -1,8 +1,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTodos, getCardColor } from '@context/TodoContext';
 import './TodoPage.css';
 
-const today = () => new Date().toISOString().split('T')[0];
+// ── Pure helpers (outside component, no stale closure risk) ──────────────────
+
+const todayStr = () => new Date().toISOString().split('T')[0];
 
 const formatDate = (dateStr) => {
   const d = new Date(dateStr + 'T00:00:00');
@@ -16,28 +19,60 @@ const fmt12 = (t) => {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
-const EMPTY_FORM = {
-  title: '',
-  description: '',
-  date: today(),
-  startTime: '',
-  endTime: '',
+const toMins = (t) => {
+  if (!t) return null;
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
 };
 
+const inWindow = (nowMins, start, end) => {
+  if (end > start) return nowMins >= start && nowMins < end;
+  if (end === start) return false;
+  // midnight-crossing: e.g. 23:00–01:00
+  return nowMins >= start || nowMins < end;
+};
+
+const getWindow = (startTime, endTime) => {
+  const start = toMins(startTime);
+  if (start === null) return null;
+  const end = endTime ? toMins(endTime) : (start + 60) % 1440;
+  return { start, end };
+};
+
+const checkCurrent = (todo, viewDate, nowMins) => {
+  if (viewDate !== todayStr()) return false;
+  if (!todo.startTime) return false;
+  const w = getWindow(todo.startTime, todo.endTime);
+  if (!w) return false;
+  return inWindow(nowMins, w.start, w.end);
+};
+
+const windowsOverlap = (s1, e1, s2, e2) => {
+  const r1 = e1 > s1 ? [[s1, e1]] : [[s1, 1440], [0, e1]];
+  const r2 = e2 > s2 ? [[s2, e2]] : [[s2, 1440], [0, e2]];
+  return r1.some(([a, b]) => r2.some(([c, d]) => a < d && c < b));
+};
+
+// ── Constants ────────────────────────────────────────────────────────────────
+
+const EMPTY_FORM = { title: '', date: todayStr(), startTime: '', endTime: '' };
 const HOURS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'));
 const MINUTES = ['00', '15', '30', '45'];
+
+// ── TimePicker ───────────────────────────────────────────────────────────────
 
 const TimePicker = ({ value, onChange, placeholder }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Parse "HH:mm" → { h, m, ampm }
   const parse = (v) => {
     if (!v) return { h: '', m: '00', ampm: 'AM' };
     const [hh, mm] = v.split(':').map(Number);
-    const ampm = hh >= 12 ? 'PM' : 'AM';
-    const h = String(hh % 12 || 12).padStart(2, '0');
-    return { h, m: String(mm).padStart(2, '0'), ampm };
+    return {
+      h: String(hh % 12 || 12).padStart(2, '0'),
+      m: String(mm).padStart(2, '0'),
+      ampm: hh >= 12 ? 'PM' : 'AM',
+    };
   };
 
   const { h, m, ampm } = parse(value);
@@ -55,13 +90,15 @@ const TimePicker = ({ value, onChange, placeholder }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const display = value ? `${h}:${m} ${ampm}` : placeholder;
-
   return (
     <div className="time-picker-wrap" ref={ref}>
-      <button type="button" className={`time-picker-trigger ${value ? 'has-value' : ''}`} onClick={() => setOpen(o => !o)}>
+      <button
+        type="button"
+        className={`time-picker-trigger ${value ? 'has-value' : ''}`}
+        onClick={() => setOpen(o => !o)}
+      >
         <span className="time-picker-icon">🕐</span>
-        <span>{display}</span>
+        <span>{value ? `${h}:${m} ${ampm}` : placeholder}</span>
         {value && (
           <span className="time-picker-clear" onClick={(e) => { e.stopPropagation(); onChange(''); }}>✕</span>
         )}
@@ -74,7 +111,7 @@ const TimePicker = ({ value, onChange, placeholder }) => {
               {HOURS.map(hv => (
                 <button key={hv} type="button"
                   className={`time-option ${h === hv ? 'active' : ''}`}
-                  onClick={() => { emit(hv, m, ampm); }}
+                  onClick={() => emit(hv, m, ampm)}
                 >{hv}</button>
               ))}
             </div>
@@ -83,7 +120,7 @@ const TimePicker = ({ value, onChange, placeholder }) => {
               {MINUTES.map(mv => (
                 <button key={mv} type="button"
                   className={`time-option ${m === mv ? 'active' : ''}`}
-                  onClick={() => { emit(h || '12', mv, ampm); }}
+                  onClick={() => emit(h || '12', mv, ampm)}
                 >{mv}</button>
               ))}
             </div>
@@ -103,17 +140,35 @@ const TimePicker = ({ value, onChange, placeholder }) => {
   );
 };
 
+// ── TodoPage ─────────────────────────────────────────────────────────────────
+
 const TodoPage = () => {
+  const navigate = useNavigate();
   const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
 
   const [tab, setTab] = useState('active');
-  const [viewDate, setViewDate] = useState(today());
+  const [viewDate, setViewDate] = useState(todayStr());
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [conflict, setConflict] = useState(null);
   const [menuOpen, setMenuOpen] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const menuRef = useRef(null);
+
+  // Live clock — ticks every 30s so "current" badge stays accurate
+  const [nowMins, setNowMins] = useState(() => {
+    const n = new Date();
+    return n.getHours() * 60 + n.getMinutes();
+  });
+
+  useEffect(() => {
+    const tick = () => {
+      const n = new Date();
+      setNowMins(n.getHours() * 60 + n.getMinutes());
+    };
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, []);
 
   // Close menu on outside click
   useEffect(() => {
@@ -128,86 +183,19 @@ const TodoPage = () => {
     weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  // Todos for the selected date
   const dateTodos = useMemo(() =>
     todos.filter(t => t.date === viewDate),
     [todos, viewDate]
   );
 
-  // Convert "HH:mm" to minutes since midnight for comparison
-  const toMins = (t) => {
-    if (!t) return null;
-    const [h, m] = t.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  // Check if nowMins falls within [start, end], handling midnight-crossing spans
-  const inWindow = (nowMins, start, end) => {
-    if (end >= start) {
-      // Normal span e.g. 08:00–10:00
-      return nowMins >= start && nowMins < end;
-    } else {
-      // Midnight-crossing span e.g. 23:00–01:00
-      return nowMins >= start || nowMins < end;
-    }
-  };
-
-  // Normalize a todo window to [start, end) minutes.
-  // If end is missing, we treat it as a 1-hour block from start.
-  const getWindow = (startTime, endTime) => {
-    const start = toMins(startTime);
-    if (start === null) return null;
-    const end = endTime ? toMins(endTime) : (start + 60) % 1440;
-    return { start, end };
-  };
-
-  // Is a todo "current" — viewing today and now falls within its time window
-  const isCurrentTodo = (todo) => {
-    if (viewDate !== today()) return false;
-    if (!todo.startTime) return false;
-    const now = new Date();
-    const nowMins = now.getHours() * 60 + now.getMinutes();
-    const window = getWindow(todo.startTime, todo.endTime);
-    if (!window) return false;
-    return inWindow(nowMins, window.start, window.end);
-  };
-
-  // Check if two time windows [s1,e1] and [s2,e2] overlap (handles midnight crossing)
-  const windowsOverlap = (s1, e1, s2, e2) => {
-    // Expand each window to a set of minute-points and check intersection
-    // Simpler: two windows overlap if each starts before the other ends
-    // For midnight-crossing: convert to two sub-ranges and check all combos
-    const ranges1 = e1 >= s1 ? [[s1, e1]] : [[s1, 1440], [0, e1]];
-    const ranges2 = e2 >= s2 ? [[s2, e2]] : [[s2, 1440], [0, e2]];
-    return ranges1.some(([a, b]) =>
-      ranges2.some(([c, d]) => a < d && c < b)
-    );
-  };
-
-  // Find conflicting todo for a given date + time window
-  const findConflict = (date, startTime, endTime, excludeId = null) => {
-    const newWindow = getWindow(startTime, endTime);
-    if (!newWindow) return null;
-
-    return todos.find(t => {
-      if (t.id === excludeId) return false;
-      if (t.date !== date) return false;
-      if (!t.startTime) return false;
-      const existingWindow = getWindow(t.startTime, t.endTime);
-      if (!existingWindow) return false;
-      return windowsOverlap(newWindow.start, newWindow.end, existingWindow.start, existingWindow.end);
-    }) || null;
-  };
-
+  // sorted depends on nowMins so it re-runs when the clock ticks
   const sorted = useMemo(() => {
     const list = dateTodos.filter(t => t.status === tab);
     return [...list].sort((a, b) => {
-      const aCurrent = isCurrentTodo(a);
-      const bCurrent = isCurrentTodo(b);
-      // Current todos float to top
-      if (aCurrent && !bCurrent) return -1;
-      if (!aCurrent && bCurrent) return 1;
-      // Then sort by startTime; no time goes last
+      const aCur = checkCurrent(a, viewDate, nowMins);
+      const bCur = checkCurrent(b, viewDate, nowMins);
+      if (aCur && !bCur) return -1;
+      if (!aCur && bCur) return 1;
       const aM = toMins(a.startTime);
       const bM = toMins(b.startTime);
       if (aM === null && bM === null) return 0;
@@ -215,10 +203,8 @@ const TodoPage = () => {
       if (bM === null) return -1;
       return aM - bM;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateTodos, tab, viewDate]);
+  }, [dateTodos, tab, viewDate, nowMins]);
 
-  // Sidebar: unique dates that have todos
   const todoDateGroups = useMemo(() => {
     const map = {};
     todos.forEach(t => {
@@ -228,16 +214,23 @@ const TodoPage = () => {
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [todos]);
 
+  const findConflict = (date, startTime, endTime, excludeId = null) => {
+    const nw = getWindow(startTime, endTime);
+    if (!nw) return null;
+    return todos.find(t => {
+      if (t.id === excludeId || t.date !== date || !t.startTime) return false;
+      const ew = getWindow(t.startTime, t.endTime);
+      if (!ew) return false;
+      return windowsOverlap(nw.start, nw.end, ew.start, ew.end);
+    }) || null;
+  };
+
   const handleAdd = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    // Check for time overlap
     if (form.startTime) {
       const clash = findConflict(form.date, form.startTime, form.endTime);
-      if (clash) {
-        setConflict(clash);
-        return;
-      }
+      if (clash) { setConflict(clash); return; }
     }
     setConflict(null);
     await addTodo({ ...form });
@@ -260,21 +253,17 @@ const TodoPage = () => {
           <span className="sidebar-logo">✅ Todos</span>
           <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
-
         <nav className="sidebar-nav">
           <button
-            className={`sidebar-nav-item ${viewDate === today() ? 'active' : ''}`}
-            onClick={() => { setViewDate(today()); setSidebarOpen(false); }}
+            className={`sidebar-nav-item ${viewDate === todayStr() ? 'active' : ''}`}
+            onClick={() => { setViewDate(todayStr()); setSidebarOpen(false); }}
           >
-            <span>📅</span> Overview
+            <span>📅</span> Today
           </button>
         </nav>
-
-        <div className="sidebar-section-label">Todo List</div>
+        <div className="sidebar-section-label">By Date</div>
         <div className="sidebar-todo-list">
-          {todoDateGroups.length === 0 && (
-            <p className="sidebar-empty">No todos yet</p>
-          )}
+          {todoDateGroups.length === 0 && <p className="sidebar-empty">No todos yet</p>}
           {todoDateGroups.map(([date, items]) => (
             <button
               key={date}
@@ -288,23 +277,23 @@ const TodoPage = () => {
         </div>
       </aside>
 
-      {/* Overlay for mobile sidebar */}
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main */}
       <main className="todo-main">
-        {/* Top bar */}
         <header className="todo-header">
           <div className="todo-header-left">
             <button className="sidebar-toggle" onClick={() => setSidebarOpen(true)}>☰</button>
+            <button className="todo-back-btn" onClick={() => navigate('/profile')}>← Back</button>
             <div className="todo-header-date">
               <h1>My Todos</h1>
               <span>{todayDisplay}</span>
             </div>
           </div>
+          <div className="todo-header-right">
+            <button className="todo-add-btn" onClick={openAdd}>+ Add New</button>
+          </div>
         </header>
 
-        {/* Date picker row */}
         <div className="todo-date-row">
           <label className="date-row-label">Viewing:</label>
           <input
@@ -313,46 +302,35 @@ const TodoPage = () => {
             onChange={e => setViewDate(e.target.value)}
             className="todo-date-input"
           />
-          {viewDate !== today() && (
-            <button className="date-today-btn" onClick={() => setViewDate(today())}>Today</button>
+          {viewDate !== todayStr() && (
+            <button className="date-today-btn" onClick={() => setViewDate(todayStr())}>Today</button>
           )}
           <span className="date-row-display">{formatDate(viewDate)}</span>
-          <button className="todo-add-btn todo-date-add-btn" onClick={openAdd}>+ Add Todo</button>
         </div>
 
-        {/* Tabs */}
         <div className="todo-tabs">
-          <button
-            className={`todo-tab ${tab === 'active' ? 'active' : ''}`}
-            onClick={() => setTab('active')}
-          >
+          <button className={`todo-tab ${tab === 'active' ? 'active' : ''}`} onClick={() => setTab('active')}>
             Active Tasks
             <span className="tab-count">{dateTodos.filter(t => t.status === 'active').length}</span>
           </button>
-          <button
-            className={`todo-tab ${tab === 'completed' ? 'active' : ''}`}
-            onClick={() => setTab('completed')}
-          >
+          <button className={`todo-tab ${tab === 'completed' ? 'active' : ''}`} onClick={() => setTab('completed')}>
             Completed
             <span className="tab-count">{dateTodos.filter(t => t.status === 'completed').length}</span>
           </button>
         </div>
 
-        {/* Cards grid */}
         {sorted.length === 0 ? (
           <div className="todo-empty">
             <div className="todo-empty-icon">{tab === 'active' ? '📋' : '🎉'}</div>
             <h3>{tab === 'active' ? 'No active tasks' : 'Nothing completed yet'}</h3>
             <p>{tab === 'active' ? 'Add a new task to get started.' : 'Complete some tasks to see them here.'}</p>
-            {tab === 'active' && (
-              <button className="todo-add-btn" onClick={openAdd}>+ Add Task</button>
-            )}
+            {tab === 'active' && <button className="todo-add-btn" onClick={openAdd}>+ Add Task</button>}
           </div>
         ) : (
           <div className="todo-grid">
             {sorted.map(todo => {
               const color = getCardColor(todo.id);
-              const current = isCurrentTodo(todo);
+              const current = checkCurrent(todo, viewDate, nowMins);
               return (
                 <div
                   key={todo.id}
@@ -364,12 +342,11 @@ const TodoPage = () => {
                       <button
                         className="todo-check"
                         onClick={() => toggleTodo(todo.id)}
-                        title={todo.status === 'active' ? 'Mark complete' : 'Mark active'}
                         style={{ borderColor: color.border, color: color.text }}
                       >
                         {todo.status === 'completed' ? '✓' : ''}
                       </button>
-                      {current && <span className="todo-now-badge">● Current</span>}
+                      {current && <span className="todo-now-badge">● Now</span>}
                     </div>
                     <div className="todo-card-menu-wrap" ref={menuOpen === todo.id ? menuRef : null}>
                       <button
@@ -389,11 +366,8 @@ const TodoPage = () => {
                       )}
                     </div>
                   </div>
-
                   <h3 className="todo-card-title" style={{ color: color.text }}>{todo.title}</h3>
-                  {todo.description && (
-                    <p className="todo-card-desc">{todo.description}</p>
-                  )}
+                  {todo.description && <p className="todo-card-desc">{todo.description}</p>}
                   {(todo.startTime || todo.endTime) && (
                     <div className="todo-card-time" style={{ color: color.text }}>
                       🕐 {fmt12(todo.startTime)}{todo.endTime ? ` – ${fmt12(todo.endTime)}` : ''}
@@ -407,7 +381,6 @@ const TodoPage = () => {
         )}
       </main>
 
-      {/* Add Modal */}
       {showModal && (
         <div className="todo-modal-overlay" onClick={() => setShowModal(false)}>
           <div className="todo-modal" onClick={e => e.stopPropagation()}>
@@ -440,7 +413,7 @@ const TodoPage = () => {
                   <label>Start Time</label>
                   <TimePicker
                     value={form.startTime}
-                    onChange={v => { setForm({ ...form, startTime: v }); setConflict(null); }}
+                    onChange={v => { setForm(f => ({ ...f, startTime: v })); setConflict(null); }}
                     placeholder="Start time"
                   />
                 </div>
@@ -448,28 +421,23 @@ const TodoPage = () => {
                   <label>End Time</label>
                   <TimePicker
                     value={form.endTime}
-                    onChange={v => { setForm({ ...form, endTime: v }); setConflict(null); }}
+                    onChange={v => { setForm(f => ({ ...f, endTime: v })); setConflict(null); }}
                     placeholder="End time"
                   />
                 </div>
               </div>
-
               {conflict && (
                 <div className="todo-conflict-warning">
                   <span className="conflict-icon">⚠️</span>
                   <div className="conflict-text">
                     <strong>Time conflict!</strong>
-                    <span>"{conflict.title}" is already scheduled for {fmt12(conflict.startTime)}{conflict.endTime ? `–${fmt12(conflict.endTime)}` : ''}. Pick a different time.</span>
+                    <span>"{conflict.title}" is already at {fmt12(conflict.startTime)}{conflict.endTime ? `–${fmt12(conflict.endTime)}` : ''}.</span>
                   </div>
                 </div>
               )}
               <div className="todo-form-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn btn-primary" disabled={!form.title.trim()}>
-                  Add Task
-                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={!form.title.trim()}>Add Task</button>
               </div>
             </form>
           </div>
