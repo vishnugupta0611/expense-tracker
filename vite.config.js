@@ -21,6 +21,20 @@ export default defineConfig({
     },
   },
 
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor':  ['react', 'react-dom', 'react-router-dom'],
+          'charts':        ['chart.js', 'react-chartjs-2'],
+          'three':         ['three', '@react-three/fiber', '@react-three/drei'],
+          'motion':        ['framer-motion', 'gsap'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 600,
+  },
+
   server: {
     host: true,
     strictPort: true,

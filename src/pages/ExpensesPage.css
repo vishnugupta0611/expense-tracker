@@ -800,8 +800,7 @@ iple Spaces Support */
     padding: 0.4rem 0.8rem;
     font-size: 0.8rem;
   }
-}/* Enhance
-d Header */
+}/* Enhanced Header */
 .expenses-header {
   display: flex;
   flex-direction: row;
@@ -809,6 +808,11 @@ d Header */
   align-items: center;
   margin-bottom: 1.5rem;
   padding: 0 0.5rem;
+}
+.header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 /* Enhanced Filters Panel */
@@ -1143,4 +1147,72 @@ d Header */
   background: var(--error-light);
   color: var(--error);
   opacity: 1;
+}
+
+/* ── Skeleton loader ── */
+.expenses-skeleton {
+  padding: 1rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.skeleton-header {
+  height: 2rem;
+  width: 160px;
+  background: var(--border-light);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  animation: shimmer 1.2s infinite;
+}
+.skeleton-card {
+  background: var(--border-light);
+  border-radius: var(--radius-lg);
+  height: 100px;
+  margin-bottom: 1rem;
+  animation: shimmer 1.2s infinite;
+}
+.skeleton-card.tall { height: 200px; }
+
+@keyframes shimmer {
+  0%   { opacity: 0.5; }
+  50%  { opacity: 1; }
+  100% { opacity: 0.5; }
+}
+
+/* ── Optimistic expense item ── */
+.expense-item.optimistic {
+  opacity: 0.6;
+}
+.expense-item.optimistic .expense-amount {
+  color: var(--text-tertiary);
+}
+
+/* ── Infinite scroll ── */
+.scroll-sentinel { height: 1px; }
+
+.load-more-indicator {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 1.25rem 0;
+}
+.load-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  animation: bounce 0.8s infinite alternate;
+}
+.load-dot:nth-child(2) { animation-delay: 0.15s; }
+.load-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes bounce {
+  from { transform: translateY(0); opacity: 0.4; }
+  to   { transform: translateY(-6px); opacity: 1; }
+}
+
+.all-loaded {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  padding: 1rem 0 0.5rem;
 }

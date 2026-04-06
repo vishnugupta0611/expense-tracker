@@ -29,21 +29,35 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
 
   const submit = async () => {
     if (!amount || parseFloat(amount) <= 0) return;
+
+    const optimisticExpense = {
+      _id: `optimistic-${Date.now()}`,
+      _optimistic: true,
+      amount: parseFloat(amount),
+      category: getCategory(),
+      description: note.trim() || undefined,
+      date: new Date().toISOString(),
+    };
+
+    // Show instantly in UI
+    onExpenseAdded(optimisticExpense);
+    setShowSuccess(true);
+    reset();
+    setTimeout(() => setShowSuccess(false), 900);
+
     try {
       setLoading(true);
       const res = await api.post('/expenses', {
-        amount: parseFloat(amount),
-        category: getCategory(),
-        description: note.trim() || undefined,
+        amount: optimisticExpense.amount,
+        category: optimisticExpense.category,
+        description: optimisticExpense.description,
       });
-      setShowSuccess(true);
-      setTimeout(() => {
-        setShowSuccess(false);
-        reset();
-        onExpenseAdded(res.data.expense);
-      }, 900);
+      // Replace optimistic entry with real one from server
+      onExpenseAdded({ ...res.data.expense, _replaceOptimistic: optimisticExpense._id });
     } catch (error) {
       console.error('Failed to add expense:', error);
+      // Remove optimistic entry on failure
+      onExpenseAdded({ _removeOptimistic: optimisticExpense._id });
     } finally {
       setLoading(false);
     }

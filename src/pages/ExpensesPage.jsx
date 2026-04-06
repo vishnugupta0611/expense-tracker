@@ -1,200 +1,213 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import api from '@services/api.js';
 import QuickAddInput from '@components/expenses/QuickAddInput';
 import BudgetProgress from '@components/expenses/BudgetProgress';
 import './ExpensesPage.css';
 
+const CATEGORY_EMOJI = {
+  Food: '🍕', Transport: '🚗', Bills: '💡',
+  Grocery: '🛒', Entertainment: '🎬', Other: '📦',
+};
+
 const ExpensesPage = () => {
   const [categories, setCategories] = useState([]);
   const [todayTotal, setTodayTotal] = useState(0);
-  const [, setMonthlyTotal] = useState(0);
+  const [weeklyTotal, setWeeklyTotal] = useState(0);
   const [budgetStatus, setBudgetStatus] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [spaces, setSpaces] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showClearDialog, setShowClearDialog] = useState(false);
-  
-  // Stats states
-  const [weeklyTotal, setWeeklyTotal] = useState(0);
-  const [, setCategoryStats] = useState({});
-  const [, setExpenseStreak] = useState(0);
 
-  const fetchData = useCallback(async () => {
+  // Pagination state
+  const [nextCursor, setNextCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingRef = useRef(false); // ref guard to avoid stale closure issues
+
+  // Initial load state — only block UI on very first load
+  const [initialLoading, setInitialLoading] = useState(true);
+
+  const sentinelRef = useRef(null);
+  const observerRef = useRef(null);
+
+  // ── Sidebar data (non-blocking) ──────────────────────────────────────────
+  const fetchSidebarData = useCallback(async () => {
+    const defaultCategories = ['Food', 'Transport', 'Bills', 'Grocery', 'Entertainment', 'Other'];
     try {
-      setLoading(true);
-      
-      // Set default categories as fallback
-      const defaultCategories = ['Food', 'Transport', 'Bills', 'Grocery', 'Entertainment', 'Other'];
-      
-      const [categoriesRes, todayRes, monthlyRes, budgetRes, expensesRes, spacesRes] = await Promise.all([
+      const [categoriesRes, todayRes, budgetRes, spacesRes] = await Promise.all([
         api.get('/categories').catch(() => ({ data: { categories: defaultCategories } })),
-        api.get('/expenses/today'),
-        api.get('/expenses/monthly'),
-        api.get('/expenses/budget-status'),
-        api.get('/expenses'),
-        api.get('/spaces'),
+        api.get('/expenses/today').catch(() => ({ data: { total: 0 } })),
+        api.get('/expenses/budget-status').catch(() => ({ data: null })),
+        api.get('/spaces').catch(() => ({ data: { spaces: [] } })),
       ]);
 
-      // Handle categories response - it might be an array or object with categories property
       const categoriesData = categoriesRes.data.categories || categoriesRes.data || defaultCategories;
-      setCategories(Array.isArray(categoriesData) ? categoriesData.map(cat => cat.name || cat) : defaultCategories);
-      
+      setCategories(Array.isArray(categoriesData) ? categoriesData.map(c => c.name || c) : defaultCategories);
       setTodayTotal(todayRes.data.total || 0);
-      setMonthlyTotal(monthlyRes.data.total || 0);
       setBudgetStatus(budgetRes.data);
-      setExpenses(expensesRes.data.expenses || []);
-      
-      // Calculate additional stats
-      calculateStats(expensesRes.data.expenses || []);
-      
-      // Fetch spaces with balances
+
+      // Set spaces immediately, then enrich with balances in background
       const spacesData = spacesRes.data.spaces || spacesRes.data || [];
-      const spacesWithBalances = await Promise.all(
-        spacesData.map(async (space) => {
-          try {
-            const balanceRes = await api.get(`/spaces/${space._id}/balance`);
-            return {
-              ...space,
-              userBalance: balanceRes.data
-            };
-          } catch (error) {
-            console.error(`Failed to fetch balance for space ${space._id}:`, error);
-            return {
-              ...space,
-              userBalance: { balance: 0, status: 'settled', amount: 0 }
-            };
-          }
-        })
-      );
-      
-      setSpaces(spacesWithBalances);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
-      // Set fallback data to prevent blank screen
-      setCategories(['Food', 'Transport', 'Bills', 'Grocery', 'Entertainment', 'Other']);
-      setTodayTotal(0);
-      setMonthlyTotal(0);
-      setExpenses([]);
-      setSpaces([]);
+      setSpaces(spacesData.map(s => ({ ...s, userBalance: { balance: 0, status: 'settled', amount: 0 } })));
+
+      // Enrich balances without blocking
+      spacesData.forEach(async (space) => {
+        try {
+          const r = await api.get(`/spaces/${space._id}/balance`);
+          setSpaces(prev => prev.map(s => s._id === space._id ? { ...s, userBalance: r.data } : s));
+        } catch { /* keep default */ }
+      });
+    } catch (e) {
+      console.error('Sidebar fetch error:', e);
+      setCategories(defaultCategories);
+    }
+  }, []);
+
+  // ── Paginated expense loader ─────────────────────────────────────────────
+  const loadExpenses = useCallback(async (cursor = null) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
+    setLoadingMore(true);
+    try {
+      const params = cursor ? { before: cursor } : {};
+      const res = await api.get('/expenses', { params });
+      const { expenses: newExpenses, hasMore: more, nextCursor: nc } = res.data;
+
+      setExpenses(prev => {
+        const ids = new Set(prev.map(e => e._id));
+        return [...prev, ...newExpenses.filter(e => !ids.has(e._id))];
+      });
+
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      setWeeklyTotal(prev => {
+        const newWeekly = newExpenses
+          .filter(e => new Date(e.date) >= weekStart)
+          .reduce((s, e) => s + e.amount, 0);
+        return cursor ? prev + newWeekly : newWeekly;
+      });
+
+      setHasMore(more);
+      setNextCursor(nc);
+    } catch (e) {
+      console.error('Load expenses error:', e);
     } finally {
-      setLoading(false);
+      loadingRef.current = false;
+      setLoadingMore(false);
     }
-  }, []); // Empty dependency array to prevent recreation
+  }, []); // stable — uses ref for guard
 
+  // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const init = async () => {
+      // Load expenses + sidebar in parallel — don't wait for sidebar
+      fetchSidebarData();
+      await loadExpenses(null);
+      setInitialLoading(false);
+    };
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const calculateStats = (expensesList) => {
-    // Weekly total
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 7);
-    const weeklyExpenses = expensesList.filter(exp => new Date(exp.date) >= weekStart);
-    setWeeklyTotal(weeklyExpenses.reduce((sum, exp) => sum + exp.amount, 0));
+  // ── Intersection Observer ────────────────────────────────────────────────
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
 
-    // Category stats
-    const categoryBreakdown = {};
-    expensesList.forEach(expense => {
-      if (!categoryBreakdown[expense.category]) {
-        categoryBreakdown[expense.category] = { total: 0, count: 0 };
-      }
-      categoryBreakdown[expense.category].total += expense.amount;
-      categoryBreakdown[expense.category].count += 1;
-    });
-    setCategoryStats(categoryBreakdown);
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingRef.current) {
+          loadExpenses(nextCursor);
+        }
+      },
+      { rootMargin: '200px' }
+    );
 
-    // Calculate expense streak (consecutive days with expenses)
-    const today = new Date();
-    let streak = 0;
-    for (let i = 0; i < 30; i++) {
-      const checkDate = new Date(today);
-      checkDate.setDate(today.getDate() - i);
-      const hasExpenseOnDate = expensesList.some(exp => {
-        const expDate = new Date(exp.date);
-        return expDate.toDateString() === checkDate.toDateString();
-      });
-      if (hasExpenseOnDate) {
-        streak++;
-      } else {
-        break;
-      }
+    if (sentinelRef.current) observerRef.current.observe(sentinelRef.current);
+    return () => observerRef.current?.disconnect();
+  }, [hasMore, nextCursor, loadExpenses]);
+
+  // ── Optimistic add ───────────────────────────────────────────────────────
+  const handleExpenseAdded = useCallback((newExpense) => {
+    if (!newExpense) return;
+
+    // Replace optimistic entry with real server entry
+    if (newExpense._replaceOptimistic) {
+      setExpenses(prev =>
+        prev.map(e => e._id === newExpense._replaceOptimistic ? { ...newExpense, _optimistic: false } : e)
+      );
+      return;
     }
-    setExpenseStreak(streak);
-  };
 
-  const handleExpenseAdded = (newExpense) => {
-    if (newExpense) {
-      setExpenses(prev => [newExpense, ...prev]);
-      setTodayTotal(prev => prev + newExpense.amount);
-      setWeeklyTotal(prev => prev + newExpense.amount);
-    } else {
-      fetchData();
+    // Remove failed optimistic entry
+    if (newExpense._removeOptimistic) {
+      setExpenses(prev => prev.filter(e => e._id !== newExpense._removeOptimistic));
+      const removed = expenses.find(e => e._id === newExpense._removeOptimistic);
+      if (removed) {
+        const isToday = new Date(removed.date).toDateString() === new Date().toDateString();
+        const isThisWeek = new Date(removed.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
+        if (isToday) setTodayTotal(prev => prev - removed.amount);
+        if (isThisWeek) setWeeklyTotal(prev => prev - removed.amount);
+      }
+      return;
     }
-  };
 
-  const handleDeleteExpense = async (id) => {
+    // Add new (optimistic or real)
+    setExpenses(prev => [newExpense, ...prev]);
+    const isToday = new Date(newExpense.date).toDateString() === new Date().toDateString();
+    const isThisWeek = new Date(newExpense.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
+    if (isToday) setTodayTotal(prev => prev + newExpense.amount);
+    if (isThisWeek) setWeeklyTotal(prev => prev + newExpense.amount);
+  }, [expenses]);
+
+  // ── Delete ───────────────────────────────────────────────────────────────
+  const handleDeleteExpense = useCallback(async (id) => {
+    const expense = expenses.find(e => e._id === id);
+    // Optimistic remove
+    setExpenses(prev => prev.filter(e => e._id !== id));
+    if (expense) {
+      const isToday = new Date(expense.date).toDateString() === new Date().toDateString();
+      const isThisWeek = new Date(expense.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
+      if (isToday) setTodayTotal(prev => prev - expense.amount);
+      if (isThisWeek) setWeeklyTotal(prev => prev - expense.amount);
+    }
     try {
-      const expense = expenses.find(e => e._id === id);
       await api.delete(`/expenses/${id}`);
-      setExpenses(prev => prev.filter(e => e._id !== id));
-      if (expense) {
-        const isToday = new Date(expense.date).toDateString() === new Date().toDateString();
-        const isThisWeek = new Date(expense.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
-        if (isToday) setTodayTotal(prev => prev - expense.amount);
-        if (isThisWeek) setWeeklyTotal(prev => prev - expense.amount);
-      }
-    } catch (error) {
-      console.error('Failed to delete expense:', error);
+    } catch (e) {
+      console.error('Delete failed, restoring:', e);
+      if (expense) setExpenses(prev => [expense, ...prev]);
     }
-  };
+  }, [expenses]);
 
-  const handleClearHistory = async (saveHistory = false) => {
-    try {
-      if (saveHistory) {
-        const startDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-        const endDate = new Date();
-        await api.post('/expenses/save-history', {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          expenses: expenses
-        });
-      }
-      
-      await api.delete('/expenses/clear-all');
-      setShowClearDialog(false);
-      fetchData();
-    } catch (error) {
-      console.error('Failed to clear history:', error);
-    }
-  };
-
-
-
-  const groupExpensesByDate = (expenses) => {
+  // ── Group by date ────────────────────────────────────────────────────────
+  const groupExpensesByDate = (list) => {
     const groups = {};
-    expenses.forEach((expense) => {
+    list.forEach((expense) => {
       const date = new Date(expense.date).toLocaleDateString('en-IN', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
+        year: 'numeric', month: 'short', day: 'numeric',
       });
-      if (!groups[date]) {
-        groups[date] = [];
-      }
+      if (!groups[date]) groups[date] = [];
       groups[date].push(expense);
     });
     return groups;
   };
 
   const groupedExpenses = groupExpensesByDate(expenses);
-  const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="expenses-page">
-        <div className="loading-container">
-          <div className="spinner"></div>
-          <p>Loading expenses...</p>
+        <div className="expenses-skeleton">
+          <div className="skeleton-header" />
+          <div className="expenses-layout">
+            <div className="expenses-sidebar">
+              <div className="skeleton-card" />
+              <div className="skeleton-card tall" />
+            </div>
+            <div className="expenses-main">
+              <div className="skeleton-card" />
+              <div className="skeleton-card tall" />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -204,16 +217,21 @@ const ExpensesPage = () => {
     <div className="expenses-page">
       <div className="expenses-header">
         <h1>Expenses</h1>
-        <button className="mobile-analytics-btn" onClick={() => window.location.href = '/analytics'}>
-          <span className="analytics-icon">📊</span>
-          <span className="analytics-text">Analytics</span>
-        </button>
+        <div className="header-actions">
+          <button className="mobile-analytics-btn" onClick={() => window.location.href = '/wallet'}>
+            <span className="analytics-icon">💰</span>
+            <span className="analytics-text">Wallet</span>
+          </button>
+          <button className="mobile-analytics-btn" onClick={() => window.location.href = '/analytics'}>
+            <span className="analytics-icon">📊</span>
+            <span className="analytics-text">Analytics</span>
+          </button>
+        </div>
       </div>
 
       <div className="expenses-layout">
-        {/* Enhanced Left Column */}
+        {/* Left Sidebar */}
         <div className="expenses-sidebar">
-          {/* Enhanced Summary Cards */}
           <div className="spending-summary">
             <div className="summary-card">
               <span className="summary-label">Today</span>
@@ -226,8 +244,7 @@ const ExpensesPage = () => {
           </div>
 
           <BudgetProgress budgetStatus={budgetStatus} />
-          
-          {/* Space Sharing */}
+
           {spaces.length > 0 ? (
             spaces.map((space) => (
               <div key={space._id} className="space-sharing">
@@ -237,18 +254,12 @@ const ExpensesPage = () => {
                     <span className="space-icon">🏠</span>
                     <span className="space-name">{space.name}</span>
                   </div>
-                  
                   {space.userBalance && space.userBalance.status !== 'settled' ? (
                     <div className={`sharing-alert ${space.userBalance.status === 'owed' ? 'positive' : 'negative'}`}>
-                      <span className="sharing-icon">
-                        {space.userBalance.status === 'owed' ? '💰' : '💸'}
-                      </span>
+                      <span className="sharing-icon">{space.userBalance.status === 'owed' ? '💰' : '💸'}</span>
                       <div className="sharing-text">
                         <span className="sharing-label">
-                          {space.userBalance.status === 'owed' 
-                            ? 'Others will pay you' 
-                            : 'You need to pay others'
-                          }
+                          {space.userBalance.status === 'owed' ? 'Others will pay you' : 'You need to pay others'}
                         </span>
                         <span className="sharing-amount">₹{space.userBalance.amount.toFixed(0)}</span>
                       </div>
@@ -262,11 +273,7 @@ const ExpensesPage = () => {
                       </div>
                     </div>
                   )}
-                  
-                  <button 
-                    className="view-space-btn" 
-                    onClick={() => window.location.href = `/spaces/${space._id}`}
-                  >
+                  <button className="view-space-btn" onClick={() => window.location.href = `/spaces/${space._id}`}>
                     View {space.name}
                   </button>
                 </div>
@@ -279,10 +286,7 @@ const ExpensesPage = () => {
                 <div className="no-spaces">
                   <span className="no-spaces-icon">🏠</span>
                   <span className="no-spaces-text">No shared spaces yet</span>
-                  <button 
-                    className="create-space-btn" 
-                    onClick={() => window.location.href = '/spaces'}
-                  >
+                  <button className="create-space-btn" onClick={() => window.location.href = '/spaces'}>
                     Create Space
                   </button>
                 </div>
@@ -291,7 +295,7 @@ const ExpensesPage = () => {
           )}
         </div>
 
-        {/* Enhanced Right Column */}
+        {/* Right Main */}
         <div className="expenses-main">
           <QuickAddInput categories={categories} onExpenseAdded={handleExpenseAdded} />
 
@@ -303,7 +307,7 @@ const ExpensesPage = () => {
                 <span className="expense-total">₹{totalExpenses.toFixed(0)}</span>
               </div>
             </div>
-            
+
             {Object.keys(groupedExpenses).length === 0 ? (
               <div className="no-expenses">
                 <p>No expenses yet. Add your first expense above!</p>
@@ -314,90 +318,60 @@ const ExpensesPage = () => {
                   <div className="expense-date-header">
                     <h4 className="expense-date">{date}</h4>
                     <span className="date-total">
-                      ₹{dateExpenses.reduce((sum, exp) => sum + exp.amount, 0).toFixed(0)}
+                      ₹{dateExpenses.reduce((sum, e) => sum + e.amount, 0).toFixed(0)}
                     </span>
                   </div>
                   {dateExpenses.map((expense) => (
-                    <div key={expense._id} className="expense-item">
+                    <div
+                      key={expense._id}
+                      className={`expense-item${expense._optimistic ? ' optimistic' : ''}`}
+                    >
                       <div className="expense-icon">
-                        {expense.category === 'Food' && '🍕'}
-                        {expense.category === 'Transport' && '🚗'}
-                        {expense.category === 'Bills' && '💡'}
-                        {expense.category === 'Grocery' && '🛒'}
-                        {expense.category === 'Entertainment' && '🎬'}
-                        {expense.category === 'Other' && '📦'}
-                        {!['Food','Transport','Bills','Grocery','Entertainment','Other'].includes(expense.category) && '🏷️'}
+                        {CATEGORY_EMOJI[expense.category] || '🏷️'}
                       </div>
                       <div className="expense-info">
-                        <div className="expense-main-info">
-                          <span className="expense-title expense-category ">
-                            {expense.description || expense.category}
-                          </span>
-                          {/* <span className=" badge-primary">
-                            {expense.category}
-                          </span> */}
-                        </div>
-                        <div className="expense-meta">
-                          <span className="expense-time">
-                            {new Date(expense.date).toLocaleTimeString('en-IN', {
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}
-                          </span>
-                        </div>
+                        <span className="expense-title">
+                          {expense.description || expense.category}
+                        </span>
+                        <span className="expense-time">
+                          {new Date(expense.date).toLocaleTimeString('en-IN', {
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
                       </div>
                       <div className="expense-actions">
                         <span className="expense-amount">₹{expense.amount.toFixed(0)}</span>
-                        <button
-                          className="delete-btn"
-                          onClick={() => handleDeleteExpense(expense._id)}
-                          title="Delete expense"
-                        >
-                          ×
-                        </button>
+                        {!expense._optimistic && (
+                          <button
+                            className="delete-btn"
+                            onClick={() => handleDeleteExpense(expense._id)}
+                            title="Delete expense"
+                          >
+                            ×
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
                 </div>
               ))
             )}
+
+            {/* Intersection sentinel */}
+            <div ref={sentinelRef} className="scroll-sentinel" />
+
+            {loadingMore && (
+              <div className="load-more-indicator">
+                <span className="load-dot" /><span className="load-dot" /><span className="load-dot" />
+              </div>
+            )}
+
+            {!hasMore && expenses.length > 0 && (
+              <p className="all-loaded">All expenses loaded</p>
+            )}
           </div>
         </div>
       </div>
-
-      {/* Clear History Dialog */}
-      {showClearDialog && (
-        <div className="dialog-overlay" onClick={() => setShowClearDialog(false)}>
-          <div className="dialog" onClick={(e) => e.stopPropagation()}>
-            <h3>Clear Expense History</h3>
-            <p>Do you want to save the history for this month before clearing?</p>
-            <div className="dialog-date-range">
-              <span>From: {new Date(new Date().getFullYear(), new Date().getMonth(), 1).toLocaleDateString()}</span>
-              <span>To: {new Date().toLocaleDateString()}</span>
-            </div>
-            <div className="dialog-actions">
-              <button 
-                className="btn btn-secondary" 
-                onClick={() => setShowClearDialog(false)}
-              >
-                Cancel
-              </button>
-              <button 
-                className="btn btn-primary" 
-                onClick={() => handleClearHistory(true)}
-              >
-                Save & Clear
-              </button>
-              <button 
-                className="btn btn-error" 
-                onClick={() => handleClearHistory(false)}
-              >
-                Clear Without Saving
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
