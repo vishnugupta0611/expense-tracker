@@ -4,23 +4,45 @@ import api from '@services/api';
 import { useNotesTheme } from '@hooks/useNotesTheme';
 import './NoteEditorPage.css';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
 const DRAFT_KEY = (id) => `note_draft_${id}`;
-const SYNC_EVERY = 300; // sync to backend every 300 chars typed since last sync
+const SYNC_EVERY = 300;
 
-// blocks → HTML for the editor div
+const FONT_STYLES = [
+  { label: 'Default', value: '' },
+  { label: 'Serif',   value: 'serif' },
+  { label: 'Mono',    value: 'mono' },
+  { label: 'Italic',  value: 'italic' },
+  { label: 'Bold',    value: 'bold' },
+];
+
+// ── Serialise / deserialise ───────────────────────────────────────────────────
+
+const blockAttrs = (b) => {
+  let style = '';
+  if (b.color) style += `color:${b.color};`;
+  if (b.fontStyle === 'serif')  style += 'font-family:Georgia,serif;';
+  if (b.fontStyle === 'mono')   style += "font-family:'Courier New',monospace;";
+  if (b.fontStyle === 'italic') style += 'font-style:italic;';
+  if (b.fontStyle === 'bold')   style += 'font-weight:700;';
+  const styleAttr = style ? ` style="${style}"` : '';
+  const colorAttr = b.color ? ` data-color="${b.color}"` : '';
+  const fontAttr  = b.fontStyle ? ` data-font="${b.fontStyle}"` : '';
+  return styleAttr + colorAttr + fontAttr;
+};
+
 const blocksToHtml = (blocks) => {
   if (!blocks?.length) return '<p><br></p>';
   return blocks.map(b => {
+    const a = blockAttrs(b);
     if (b.type === 'image') return `<img src="${b.content}" class="note-img" data-saved="1" />`;
-    if (b.type === 'h1') return `<h1>${b.content}</h1>`;
-    if (b.type === 'h2') return `<h2>${b.content}</h2>`;
-    return `<p>${b.content || '<br>'}</p>`;
+    if (b.type === 'code')  return `<pre class="note-code"${a}>${b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || ''}</pre>`;
+    if (b.type === 'divider') return `<hr class="note-divider" />`;
+    if (b.type === 'h1')    return `<h1${a}>${b.content}</h1>`;
+    if (b.type === 'h2')    return `<h2${a}>${b.content}</h2>`;
+    return `<p${a}>${b.content || '<br>'}</p>`;
   }).join('');
 };
 
-// editor div → blocks array (clean, no browser junk)
 const htmlToBlocks = (el) => {
   const blocks = [];
   el.childNodes.forEach(node => {
@@ -30,23 +52,29 @@ const htmlToBlocks = (el) => {
       return;
     }
     const tag = node.tagName?.toLowerCase();
+    const color = node.getAttribute?.('data-color') || '';
+    const fontStyle = node.getAttribute?.('data-font') || '';
+
     if (tag === 'img') {
       const src = node.getAttribute('src') || node.src;
-      // Skip blob: URLs (upload still in progress) and placeholder images
       if (src && !src.startsWith('blob:') && !node.getAttribute('data-placeholder')) {
         blocks.push({ type: 'image', content: src });
       }
+    } else if (tag === 'hr') {
+      blocks.push({ type: 'divider', content: '' });
+    } else if (tag === 'pre') {
+      // innerText preserves \n line breaks; textContent does not on all browsers
+      blocks.push({ type: 'code', content: node.innerText || node.textContent || '', color, fontStyle });
     } else if (tag === 'h1') {
       const c = node.innerHTML.trim();
-      if (c) blocks.push({ type: 'h1', content: c });
+      if (c) blocks.push({ type: 'h1', content: c, color, fontStyle });
     } else if (tag === 'h2') {
       const c = node.innerHTML.trim();
-      if (c) blocks.push({ type: 'h2', content: c });
+      if (c) blocks.push({ type: 'h2', content: c, color, fontStyle });
     } else {
       const c = node.innerHTML;
-      // keep non-empty paragraphs (even just <br>)
       if (c && c !== '<br>' || node.textContent.trim()) {
-        blocks.push({ type: 'text', content: c || '' });
+        blocks.push({ type: 'text', content: c || '', color, fontStyle });
       }
     }
   });
@@ -55,43 +83,37 @@ const htmlToBlocks = (el) => {
 
 const saveDraft = (id, title, el) => {
   try {
-    const blocks = htmlToBlocks(el);
-    localStorage.setItem(DRAFT_KEY(id), JSON.stringify({ title, blocks, ts: Date.now() }));
+    localStorage.setItem(DRAFT_KEY(id), JSON.stringify({ title, blocks: htmlToBlocks(el), ts: Date.now() }));
   } catch { /* storage full */ }
 };
-
 const loadDraft = (id) => {
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY(id));
-    return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  try { const r = localStorage.getItem(DRAFT_KEY(id)); return r ? JSON.parse(r) : null; } catch { return null; }
 };
-
-const clearDraft = (id) => {
-  try { localStorage.removeItem(DRAFT_KEY(id)); } catch { /* ignore */ }
-};
+const clearDraft = (id) => { try { localStorage.removeItem(DRAFT_KEY(id)); } catch { /* ignore */ } };
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const NoteEditorPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const editorRef = useRef(null);
+  const editorRef   = useRef(null);
   const fileInputRef = useRef(null);
-  const saveTimer = useRef(null);
-  const toolbarRef = useRef(null);
-  const titleRef = useRef('Untitled');
+  const saveTimer   = useRef(null);
+  const toolbarRef  = useRef(null);
+  const titleRef    = useRef('Untitled');
   const charsSinceSync = useRef(0);
-  const isSyncing = useRef(false);
+  const isSyncing   = useRef(false);
 
-  const [title, setTitle] = useState('Untitled');
-  const [loading, setLoading] = useState(true);
-  const [saveStatus, setSaveStatus] = useState('saved'); // saved | unsaved | saving | uploading
-  const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0 });
-  const [copied, setCopied] = useState(false);
+  const [title, setTitle]           = useState('Untitled');
+  const [loading, setLoading]       = useState(true);
+  const [saveStatus, setSaveStatus] = useState('saved');
+  const [toolbar, setToolbar]       = useState({ visible: false, x: 0, y: 0 });
+  const [copied, setCopied]         = useState(false);
+  const [colorPicker, setColorPicker] = useState(false);
+  const [fontMenu, setFontMenu]     = useState(false);
   const { dark, toggle: toggleTheme } = useNotesTheme();
 
-  // ── Load: backend first, fall back to draft ──────────────────────────────────
+  // ── Load ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     api.get(`/notes/${id}`)
@@ -99,29 +121,19 @@ const NoteEditorPage = () => {
         if (cancelled) return;
         const note = r.data.note;
         const draft = loadDraft(id);
-
-        // Use draft if it's newer than the server version
         const serverTs = new Date(note.updatedAt).getTime();
         const useDraft = draft && draft.ts > serverTs && draft.blocks?.length;
-
         const t = useDraft ? draft.title : (note.title || 'Untitled');
         const html = blocksToHtml(useDraft ? draft.blocks : note.blocks);
-
         titleRef.current = t;
         setTitle(t);
         setLoading(false);
-
-        // Set editor content after render (requestAnimationFrame ensures DOM is ready)
         requestAnimationFrame(() => {
-          if (editorRef.current && !cancelled) {
-            editorRef.current.innerHTML = html;
-          }
+          if (editorRef.current && !cancelled) editorRef.current.innerHTML = html;
         });
       })
-      .catch(err => {
+      .catch(() => {
         if (cancelled) return;
-        console.error('Load failed', err);
-        // Try draft as fallback
         const draft = loadDraft(id);
         if (draft) {
           titleRef.current = draft.title;
@@ -135,7 +147,7 @@ const NoteEditorPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
-  // ── Sync to backend ──────────────────────────────────────────────────────────
+  // ── Sync ──────────────────────────────────────────────────────────────────────
   const syncToBackend = useCallback(async () => {
     if (!editorRef.current || isSyncing.current) return;
     isSyncing.current = true;
@@ -146,32 +158,19 @@ const NoteEditorPage = () => {
       charsSinceSync.current = 0;
       clearDraft(id);
       setSaveStatus('saved');
-    } catch (e) {
-      console.error('Sync failed', e);
-      setSaveStatus('unsaved');
-    } finally {
-      isSyncing.current = false;
-    }
+    } catch { setSaveStatus('unsaved'); }
+    finally { isSyncing.current = false; }
   }, [id]);
 
-  // ── Schedule save: localStorage immediately, backend debounced ───────────────
   const scheduleSave = useCallback(() => {
     setSaveStatus('unsaved');
-    // Always save to localStorage immediately
     if (editorRef.current) saveDraft(id, titleRef.current, editorRef.current);
-
     charsSinceSync.current += 1;
-
-    // Sync to backend: either after SYNC_EVERY chars or after 2s idle
     clearTimeout(saveTimer.current);
-    if (charsSinceSync.current >= SYNC_EVERY) {
-      syncToBackend();
-    } else {
-      saveTimer.current = setTimeout(syncToBackend, 2000);
-    }
+    if (charsSinceSync.current >= SYNC_EVERY) syncToBackend();
+    else saveTimer.current = setTimeout(syncToBackend, 2000);
   }, [id, syncToBackend]);
 
-  // ── Save on page unload ───────────────────────────────────────────────────────
   useEffect(() => {
     const handleUnload = () => {
       if (editorRef.current) saveDraft(id, titleRef.current, editorRef.current);
@@ -180,30 +179,18 @@ const NoteEditorPage = () => {
     return () => {
       window.removeEventListener('beforeunload', handleUnload);
       clearTimeout(saveTimer.current);
-      // Final sync on unmount — capture ref value now
-      const el = editorRef.current;
-      if (el) {
-        api.put(`/notes/${id}`, {
-          title: titleRef.current,
-          blocks: htmlToBlocks(el),
-        }).catch(() => {});
-      }
+      const el = editorRef.current; // capture before cleanup
+      if (el) api.put(`/notes/${id}`, { title: titleRef.current, blocks: htmlToBlocks(el) }).catch(() => {});
     };
   }, [id, syncToBackend]);
 
-  const handleEditorInput = () => scheduleSave();
-
-  const handleTitleChange = (e) => {
-    titleRef.current = e.target.value;
-    setTitle(e.target.value);
-    scheduleSave();
-  };
-
-  // ── Floating format toolbar ───────────────────────────────────────────────────
+  // ── Floating toolbar ──────────────────────────────────────────────────────────
   const handleSelectionChange = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
       setToolbar(t => ({ ...t, visible: false }));
+      setColorPicker(false);
+      setFontMenu(false);
       return;
     }
     if (!editorRef.current?.contains(sel.anchorNode)) {
@@ -219,97 +206,73 @@ const NoteEditorPage = () => {
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [handleSelectionChange]);
 
-  const applyFormat = (tag) => {
+  // Get the block-level node that contains the selection
+  const getSelectedBlock = () => {
     const sel = window.getSelection();
-    if (!sel || sel.isCollapsed) return;
+    if (!sel) return null;
     let node = sel.anchorNode;
     while (node && node.parentNode !== editorRef.current) node = node.parentNode;
-    if (!node || node === editorRef.current) return;
+    return (node && node !== editorRef.current) ? node : null;
+  };
+
+  const applyFormat = (tag) => {
+    const node = getSelectedBlock();
+    if (!node) return;
+    const color = node.getAttribute?.('data-color') || '';
+    const font  = node.getAttribute?.('data-font') || '';
     const newEl = document.createElement(tag);
     newEl.innerHTML = node.innerHTML;
+    if (color) { newEl.setAttribute('data-color', color); newEl.style.color = color; }
+    if (font)  applyFontStyle(newEl, font);
     node.replaceWith(newEl);
     setToolbar(t => ({ ...t, visible: false }));
-    sel.removeAllRanges();
+    window.getSelection()?.removeAllRanges();
     scheduleSave();
   };
 
-  // ── Image upload — show placeholder instantly, upload in background ───────────
-  const triggerImageUpload = () => fileInputRef.current?.click();
-
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = '';
-
-    // 1. Show local blob preview instantly — user sees image immediately
-    const localUrl = URL.createObjectURL(file);
-    const placeholderImg = insertImageAtCursor(localUrl, true);
-    setSaveStatus('uploading');
-
-    try {
-      // 2. Get upload signature from backend (tiny request, ~50ms)
-      const sigRes = await api.get('/notes/upload-signature');
-      const { timestamp, signature, apiKey, cloudName, folder } = sigRes.data;
-
-      // 3. Upload directly from browser to Cloudinary (no backend relay)
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('api_key', apiKey);
-      formData.append('timestamp', timestamp);
-      formData.append('signature', signature);
-      formData.append('folder', folder);
-
-      const uploadRes = await fetch(
-        `https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: 'POST', body: formData }
-      );
-      const data = await uploadRes.json();
-
-      if (!data.secure_url) {
-        throw new Error(data.error?.message || 'Upload failed');
-      }
-
-      // 4. Swap placeholder with real Cloudinary URL
-      if (placeholderImg && editorRef.current?.contains(placeholderImg)) {
-        placeholderImg.src = data.secure_url;
-        placeholderImg.style.opacity = '1';
-        placeholderImg.removeAttribute('data-placeholder');
-      }
-      URL.revokeObjectURL(localUrl);
-      scheduleSave();
-    } catch (err) {
-      console.error('Upload failed', err);
-      if (placeholderImg && editorRef.current?.contains(placeholderImg)) {
-        placeholderImg.remove();
-      }
-      URL.revokeObjectURL(localUrl);
-      setSaveStatus('unsaved');
-      alert(`Image upload failed: ${err.message}`);
-    }
+  const applyFontStyle = (el, font) => {
+    el.setAttribute('data-font', font);
+    el.style.fontFamily = '';
+    el.style.fontStyle  = '';
+    el.style.fontWeight = '';
+    if (font === 'serif')  el.style.fontFamily = 'Georgia, serif';
+    if (font === 'mono')   el.style.fontFamily = "'Courier New', monospace";
+    if (font === 'italic') el.style.fontStyle  = 'italic';
+    if (font === 'bold')   el.style.fontWeight = '700';
   };
 
-  // Returns the inserted img element so we can update its src later
-  const insertImageAtCursor = (url, isPlaceholder = false) => {
+  const applyColor = (hex) => {
+    const node = getSelectedBlock();
+    if (!node) return;
+    node.style.color = hex;
+    node.setAttribute('data-color', hex);
+    setColorPicker(false);
+    scheduleSave();
+  };
+
+  const applyFont = (font) => {
+    const node = getSelectedBlock();
+    if (!node) return;
+    applyFontStyle(node, font);
+    setFontMenu(false);
+    scheduleSave();
+  };
+
+  // ── Insert divider ────────────────────────────────────────────────────────────
+  const insertDivider = () => {
     editorRef.current?.focus();
     const sel = window.getSelection();
-    const img = document.createElement('img');
-    img.src = url;
-    img.className = 'note-img';
-    if (isPlaceholder) {
-      img.setAttribute('data-placeholder', '1');
-      img.style.opacity = '0.5';
-    }
+    const hr = document.createElement('hr');
+    hr.className = 'note-divider';
     const p = document.createElement('p');
     p.innerHTML = '<br>';
 
-    let anchorNode = sel?.anchorNode;
-    while (anchorNode && anchorNode.parentNode !== editorRef.current) {
-      anchorNode = anchorNode.parentNode;
-    }
-    if (anchorNode && anchorNode !== editorRef.current) {
-      anchorNode.after(img, p);
+    let anchor = sel?.anchorNode;
+    while (anchor && anchor.parentNode !== editorRef.current) anchor = anchor.parentNode;
+    if (anchor && anchor !== editorRef.current) {
+      anchor.after(hr, p);
     } else {
-      editorRef.current?.appendChild(img);
+      editorRef.current?.appendChild(hr);
       editorRef.current?.appendChild(p);
     }
 
@@ -318,12 +281,119 @@ const NoteEditorPage = () => {
     range.collapse(true);
     sel?.removeAllRanges();
     sel?.addRange(range);
+    setToolbar(t => ({ ...t, visible: false }));
+    scheduleSave();
+  };
 
+  // ── Insert code block ─────────────────────────────────────────────────────────
+  const insertCodeBlock = () => {
+    editorRef.current?.focus();
+    const sel = window.getSelection();
+    const pre = document.createElement('pre');
+    pre.className = 'note-code';
+    pre.textContent = '';
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+
+    let anchor = sel?.anchorNode;
+    while (anchor && anchor.parentNode !== editorRef.current) anchor = anchor.parentNode;
+    if (anchor && anchor !== editorRef.current) {
+      anchor.after(pre, p);
+    } else {
+      editorRef.current?.appendChild(pre);
+      editorRef.current?.appendChild(p);
+    }
+
+    // Place cursor inside the pre
+    const range = document.createRange();
+    range.setStart(pre, 0);
+    range.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    setToolbar(t => ({ ...t, visible: false }));
+    scheduleSave();
+  };
+
+  // ── Image upload ──────────────────────────────────────────────────────────────
+  const triggerImageUpload = () => fileInputRef.current?.click();
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    const localUrl = URL.createObjectURL(file);
+    const placeholderImg = insertImageAtCursor(localUrl, true);
+    setSaveStatus('uploading');
+    try {
+      const sigRes = await api.get('/notes/upload-signature');
+      const { timestamp, signature, apiKey, cloudName, folder } = sigRes.data;
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('api_key', apiKey);
+      formData.append('timestamp', timestamp);
+      formData.append('signature', signature);
+      formData.append('folder', folder);
+      const uploadRes = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, { method: 'POST', body: formData });
+      const data = await uploadRes.json();
+      if (!data.secure_url) throw new Error(data.error?.message || 'Upload failed');
+      if (placeholderImg && editorRef.current?.contains(placeholderImg)) {
+        placeholderImg.src = data.secure_url;
+        placeholderImg.style.opacity = '1';
+        placeholderImg.removeAttribute('data-placeholder');
+      }
+      URL.revokeObjectURL(localUrl);
+      scheduleSave();
+    } catch (err) {
+      if (placeholderImg && editorRef.current?.contains(placeholderImg)) placeholderImg.remove();
+      URL.revokeObjectURL(localUrl);
+      setSaveStatus('unsaved');
+      alert(`Image upload failed: ${err.message}`);
+    }
+  };
+
+  const insertImageAtCursor = (url, isPlaceholder = false) => {
+    editorRef.current?.focus();
+    const sel = window.getSelection();
+    const img = document.createElement('img');
+    img.src = url;
+    img.className = 'note-img';
+    if (isPlaceholder) { img.setAttribute('data-placeholder', '1'); img.style.opacity = '0.5'; }
+    const p = document.createElement('p');
+    p.innerHTML = '<br>';
+    let anchor = sel?.anchorNode;
+    while (anchor && anchor.parentNode !== editorRef.current) anchor = anchor.parentNode;
+    if (anchor && anchor !== editorRef.current) { anchor.after(img, p); }
+    else { editorRef.current?.appendChild(img); editorRef.current?.appendChild(p); }
+    const range = document.createRange();
+    range.setStart(p, 0);
+    range.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(range);
     return img;
   };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
+      const sel = window.getSelection();
+      let node = sel?.anchorNode;
+      while (node && node.parentNode !== editorRef.current) node = node.parentNode;
+
+      if (node?.tagName?.toLowerCase() === 'pre') {
+        // Inside code block — insert a real newline character
+        e.preventDefault();
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode('\n');
+        range.insertNode(textNode);
+        // Move cursor after the \n
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        scheduleSave();
+        return;
+      }
+
       e.preventDefault();
       document.execCommand('insertParagraph');
     }
@@ -337,12 +407,9 @@ const NoteEditorPage = () => {
     });
   };
 
-  const statusLabel = {
-    saved: '✓',
-    unsaved: '●',
-    saving: '⏳',
-    uploading: '⬆',
-  }[saveStatus] || '✓';
+  const closeToolbarMenus = () => { setColorPicker(false); setFontMenu(false); };
+
+  const statusLabel = { saved: '✓', unsaved: '●', saving: '⏳', uploading: '⬆' }[saveStatus] || '✓';
 
   if (loading) return (
     <div className={`note-editor-page ${dark ? 'dark' : ''}`}>
@@ -351,12 +418,21 @@ const NoteEditorPage = () => {
   );
 
   return (
-    <div className={`note-editor-page ${dark ? 'dark' : ''}`} onClick={() => setToolbar(t => ({ ...t, visible: false }))}>
+    <div
+      className={`note-editor-page ${dark ? 'dark' : ''}`}
+      onClick={() => { setToolbar(t => ({ ...t, visible: false })); closeToolbarMenus(); }}
+    >
       <header className="note-editor-header" onClick={e => e.stopPropagation()}>
         <button className="note-back-btn" onClick={() => navigate('/notes')}>← Notes</button>
         <div className="note-editor-actions">
           <button className="note-img-upload-btn" onClick={triggerImageUpload} title="Insert image">
             🖼 <span className="btn-label">Image</span>
+          </button>
+          <button className="note-code-btn" onClick={insertCodeBlock} title="Insert code block">
+            {'<>'} <span className="btn-label">Code</span>
+          </button>
+          <button className="note-divider-btn" onClick={insertDivider} title="Insert divider">
+            — <span className="btn-label">Divider</span>
           </button>
           <button className="note-share-btn" onClick={copyShareLink} title="Copy public link">
             {copied ? '✓' : '🔗'} <span className="btn-label">{copied ? 'Copied!' : 'Share'}</span>
@@ -372,7 +448,7 @@ const NoteEditorPage = () => {
         <input
           className="note-title-input"
           value={title}
-          onChange={handleTitleChange}
+          onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
           placeholder="Untitled"
         />
         <div
@@ -380,12 +456,13 @@ const NoteEditorPage = () => {
           className="note-editor-content"
           contentEditable
           suppressContentEditableWarning
-          onInput={handleEditorInput}
+          onInput={() => scheduleSave()}
           onKeyDown={handleKeyDown}
           data-placeholder="Start writing…"
         />
       </div>
 
+      {/* Floating toolbar */}
       {toolbar.visible && (
         <div
           ref={toolbarRef}
@@ -394,9 +471,61 @@ const NoteEditorPage = () => {
           onMouseDown={e => e.preventDefault()}
           onClick={e => e.stopPropagation()}
         >
-          <button onClick={() => applyFormat('h1')}>H1</button>
-          <button onClick={() => applyFormat('h2')}>H2</button>
-          <button onClick={() => applyFormat('p')}>¶</button>
+          <button onClick={() => applyFormat('h1')} title="Heading 1">H1</button>
+          <button onClick={() => applyFormat('h2')} title="Heading 2">H2</button>
+          <button onClick={() => applyFormat('p')}  title="Paragraph">¶</button>
+
+          <div className="tb-divider" />
+
+          {/* Font style picker */}
+          <div className="tb-dropdown-wrap">
+            <button className="tb-font-btn" onClick={() => { setFontMenu(v => !v); setColorPicker(false); }} title="Font style">
+              Aa
+            </button>
+            {fontMenu && (
+              <div className="tb-dropdown font-dropdown">
+                {FONT_STYLES.map(f => (
+                  <button key={f.value} onClick={() => applyFont(f.value)} className="tb-dropdown-item">
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="tb-divider" />
+
+          {/* Color picker */}
+          <div className="tb-dropdown-wrap">
+            <button
+              className="tb-color-btn"
+              onClick={() => { setColorPicker(v => !v); setFontMenu(false); }}
+              title="Text color"
+            >
+              <span className="tb-color-dot" />
+              A
+            </button>
+            {colorPicker && (
+              <div className="tb-dropdown color-dropdown" onClick={e => e.stopPropagation()}>
+                <input
+                  type="color"
+                  className="tb-color-input"
+                  defaultValue="#e74c3c"
+                  onChange={e => applyColor(e.target.value)}
+                />
+                <div className="tb-color-presets">
+                  {['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c','#e91e63'].map(c => (
+                    <button
+                      key={c}
+                      className="tb-preset"
+                      style={{ background: c }}
+                      onClick={() => applyColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
