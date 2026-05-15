@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '@services/api';
 import { useNotesTheme } from '@hooks/useNotesTheme';
+import hljs from 'highlight.js';
+import 'highlight.js/styles/github-dark.css';
 import './NoteEditorPage.css';
 
 const DRAFT_KEY = (id) => `note_draft_${id}`;
@@ -35,7 +37,10 @@ const blocksToHtml = (blocks) => {
   return blocks.map(b => {
     const a = blockAttrs(b);
     if (b.type === 'image') return `<img src="${b.content}" class="note-img" data-saved="1" />`;
-    if (b.type === 'code')  return `<pre class="note-code"${a}>${b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || ''}</pre>`;
+    if (b.type === 'code') {
+      const escaped = b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '';
+      return `<pre class="note-code" data-lang="code" contenteditable="false"${a}><span class="note-code-header" contenteditable="false">code ● ● ●</span><code class="note-code-body" contenteditable="true">${escaped}</code></pre>`;
+    }
     if (b.type === 'divider') return `<hr class="note-divider" />`;
     if (b.type === 'h1')    return `<h1${a}>${b.content}</h1>`;
     if (b.type === 'h2')    return `<h2${a}>${b.content}</h2>`;
@@ -63,8 +68,12 @@ const htmlToBlocks = (el) => {
     } else if (tag === 'hr') {
       blocks.push({ type: 'divider', content: '' });
     } else if (tag === 'pre') {
-      // innerText preserves \n line breaks; textContent does not on all browsers
-      blocks.push({ type: 'code', content: node.innerText || node.textContent || '', color, fontStyle });
+      // get text from .note-code-body child if present, else fallback
+      const bodyEl = node.querySelector('.note-code-body');
+      const content = bodyEl
+        ? (bodyEl.innerText || bodyEl.textContent || '')
+        : (node.innerText || node.textContent || '');
+      blocks.push({ type: 'code', content, color, fontStyle });
     } else if (tag === 'h1') {
       const c = node.innerHTML.trim();
       if (c) blocks.push({ type: 'h1', content: c, color, fontStyle });
@@ -90,6 +99,17 @@ const loadDraft = (id) => {
   try { const r = localStorage.getItem(DRAFT_KEY(id)); return r ? JSON.parse(r) : null; } catch { return null; }
 };
 const clearDraft = (id) => { try { localStorage.removeItem(DRAFT_KEY(id)); } catch { /* ignore */ } };
+
+// ── Syntax highlight all pre.note-code blocks ─────────────────────────────────
+const highlightEditor = (el) => {
+  if (!el) return;
+  el.querySelectorAll('pre.note-code').forEach(pre => {
+    const body = pre.querySelector('.note-code-body');
+    if (!body || !body.textContent.trim()) return;
+    if (body.dataset.highlighted === 'yes') return;
+    hljs.highlightElement(body);
+  });
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +149,10 @@ const NoteEditorPage = () => {
         setTitle(t);
         setLoading(false);
         requestAnimationFrame(() => {
-          if (editorRef.current && !cancelled) editorRef.current.innerHTML = html;
+          if (editorRef.current && !cancelled) {
+            editorRef.current.innerHTML = html;
+            highlightEditor(editorRef.current);
+          }
         });
       })
       .catch(() => {
@@ -139,7 +162,10 @@ const NoteEditorPage = () => {
           titleRef.current = draft.title;
           setTitle(draft.title);
           requestAnimationFrame(() => {
-            if (editorRef.current) editorRef.current.innerHTML = blocksToHtml(draft.blocks);
+            if (editorRef.current) {
+              editorRef.current.innerHTML = blocksToHtml(draft.blocks);
+              highlightEditor(editorRef.current);
+            }
           });
         }
         setLoading(false);
@@ -185,26 +211,60 @@ const NoteEditorPage = () => {
   }, [id, syncToBackend]);
 
   // ── Floating toolbar ──────────────────────────────────────────────────────────
+  const toolbarRef2 = useRef({ visible: false, x: 0, y: 0 });
+
   const handleSelectionChange = useCallback(() => {
     const sel = window.getSelection();
     if (!sel || sel.isCollapsed || !sel.toString().trim()) {
-      setToolbar(t => ({ ...t, visible: false }));
-      setColorPicker(false);
-      setFontMenu(false);
+      if (toolbarRef2.current.visible) {
+        toolbarRef2.current = { visible: false, x: 0, y: 0 };
+        setToolbar({ visible: false, x: 0, y: 0 });
+        setColorPicker(false);
+        setFontMenu(false);
+      }
       return;
     }
     if (!editorRef.current?.contains(sel.anchorNode)) {
-      setToolbar(t => ({ ...t, visible: false }));
+      if (toolbarRef2.current.visible) {
+        toolbarRef2.current = { visible: false, x: 0, y: 0 };
+        setToolbar({ visible: false, x: 0, y: 0 });
+      }
       return;
     }
     const rect = sel.getRangeAt(0).getBoundingClientRect();
-    setToolbar({ visible: true, x: rect.left + rect.width / 2, y: rect.top - 8 });
+    const next = { visible: true, x: rect.left + rect.width / 2, y: rect.top - 8 };
+    // Only update state if position actually changed
+    if (
+      toolbarRef2.current.visible !== next.visible ||
+      Math.abs(toolbarRef2.current.x - next.x) > 2 ||
+      Math.abs(toolbarRef2.current.y - next.y) > 2
+    ) {
+      toolbarRef2.current = next;
+      setToolbar(next);
+    }
   }, []);
 
   useEffect(() => {
     document.addEventListener('selectionchange', handleSelectionChange);
     return () => document.removeEventListener('selectionchange', handleSelectionChange);
   }, [handleSelectionChange]);
+
+  // Re-highlight code blocks when cursor leaves them
+  useEffect(() => {
+    const el = editorRef.current;
+    if (!el) return;
+    const onFocusOut = (e) => {
+      const node = e.target;
+      if (node?.classList?.contains('note-code-body')) {
+        if (node.textContent.trim()) {
+          delete node.dataset.highlighted;
+          hljs.highlightElement(node);
+        }
+      }
+    };
+    el.addEventListener('focusout', onFocusOut);
+    return () => el.removeEventListener('focusout', onFocusOut);
+  }, []);
 
   // Get the block-level node that contains the selection
   const getSelectedBlock = () => {
@@ -289,9 +349,27 @@ const NoteEditorPage = () => {
   const insertCodeBlock = () => {
     editorRef.current?.focus();
     const sel = window.getSelection();
+
     const pre = document.createElement('pre');
     pre.className = 'note-code';
-    pre.textContent = '';
+    pre.setAttribute('data-lang', 'code');
+    pre.contentEditable = 'false'; // make the pre itself non-editable
+
+    // Real header bar
+    const header = document.createElement('span');
+    header.className = 'note-code-header';
+    header.textContent = 'code ● ● ●';
+    header.contentEditable = 'false';
+
+    // Editable body
+    const body = document.createElement('code');
+    body.className = 'note-code-body';
+    body.contentEditable = 'true';
+    body.setAttribute('data-placeholder', 'Enter code here…');
+
+    pre.appendChild(header);
+    pre.appendChild(body);
+
     const p = document.createElement('p');
     p.innerHTML = '<br>';
 
@@ -304,9 +382,9 @@ const NoteEditorPage = () => {
       editorRef.current?.appendChild(p);
     }
 
-    // Place cursor inside the pre
+    // Place cursor inside the code body
     const range = document.createRange();
-    range.setStart(pre, 0);
+    range.setStart(body, 0);
     range.collapse(true);
     sel?.removeAllRanges();
     sel?.addRange(range);
@@ -376,24 +454,24 @@ const NoteEditorPage = () => {
     if (e.key === 'Enter') {
       const sel = window.getSelection();
       let node = sel?.anchorNode;
-      while (node && node.parentNode !== editorRef.current) node = node.parentNode;
-
-      if (node?.tagName?.toLowerCase() === 'pre') {
-        // Inside code block — insert a real newline character
-        e.preventDefault();
-        const range = sel.getRangeAt(0);
-        range.deleteContents();
-        const textNode = document.createTextNode('\n');
-        range.insertNode(textNode);
-        // Move cursor after the \n
-        range.setStartAfter(textNode);
-        range.collapse(true);
-        sel.removeAllRanges();
-        sel.addRange(range);
-        scheduleSave();
-        return;
+      // walk up to find note-code-body
+      let check = node;
+      while (check && check !== editorRef.current) {
+        if (check?.classList?.contains('note-code-body')) {
+          e.preventDefault();
+          const range = sel.getRangeAt(0);
+          range.deleteContents();
+          const textNode = document.createTextNode('\n');
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          scheduleSave();
+          return;
+        }
+        check = check.parentNode;
       }
-
       e.preventDefault();
       document.execCommand('insertParagraph');
     }
@@ -407,7 +485,7 @@ const NoteEditorPage = () => {
     });
   };
 
-  const closeToolbarMenus = () => { setColorPicker(false); setFontMenu(false); };
+  const closeToolbarMenus = useCallback(() => { setColorPicker(false); setFontMenu(false); }, []);
 
   const statusLabel = { saved: '✓', unsaved: '●', saving: '⏳', uploading: '⬆' }[saveStatus] || '✓';
 
@@ -420,7 +498,7 @@ const NoteEditorPage = () => {
   return (
     <div
       className={`note-editor-page ${dark ? 'dark' : ''}`}
-      onClick={() => { setToolbar(t => ({ ...t, visible: false })); closeToolbarMenus(); }}
+      onClick={() => { if (toolbarRef2.current.visible) { toolbarRef2.current = { visible: false, x: 0, y: 0 }; setToolbar({ visible: false, x: 0, y: 0 }); } closeToolbarMenus(); }}
     >
       <header className="note-editor-header" onClick={e => e.stopPropagation()}>
         <button className="note-back-btn" onClick={() => navigate('/notes')}>← Notes</button>
@@ -511,7 +589,7 @@ const NoteEditorPage = () => {
                   type="color"
                   className="tb-color-input"
                   defaultValue="#e74c3c"
-                  onChange={e => applyColor(e.target.value)}
+                  onBlur={e => applyColor(e.target.value)}
                 />
                 <div className="tb-color-presets">
                   {['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c','#e91e63'].map(c => (

@@ -1,6 +1,6 @@
 .note-editor-page {
   min-height: 100vh;
-  background: #ffffff;
+  background: #f7f7f5;
   color: #111;
   display: flex;
   flex-direction: column;
@@ -9,11 +9,11 @@
 
 /* ── Dark theme ── */
 .note-editor-page.dark {
-  background: #111;
+  background: #1c1c1e;
   color: #e8e8e8;
 }
 .note-editor-page.dark .note-editor-header {
-  background: #1a1a1a;
+  background: #242426;
   border-bottom-color: rgba(255,255,255,0.08);
 }
 .note-editor-page.dark .note-back-btn {
@@ -52,6 +52,10 @@
   background: #0d1117;
   border-color: rgba(255,255,255,0.08);
   color: #e6edf3;
+}
+.note-editor-page.dark .note-editor-content pre.note-code::before {
+  background: #0a0f16;
+  border-bottom-color: rgba(255,255,255,0.08);
 }
 
 .note-editor-loading {
@@ -208,59 +212,107 @@
 /* ── Divider ── */
 .note-editor-content hr.note-divider {
   border: none;
-  border-top: 2px solid;
-  border-image: linear-gradient(to right, transparent, #d1d5db, transparent) 1;
-  margin: 1.75rem 0;
-  height: 0;
+  height: 1px;
+  margin: 2rem 0;
+  background: linear-gradient(to right, transparent, #6366f1 20%, #a78bfa 50%, #6366f1 80%, transparent);
+  opacity: 0.5;
   cursor: default;
+  position: relative;
+}
+.note-editor-content hr.note-divider::after {
+  content: '✦';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--card-bg, #fff);
+  color: #a78bfa;
+  font-size: 0.65rem;
+  padding: 0 0.5rem;
+  line-height: 1;
 }
 .note-editor-page.dark .note-editor-content hr.note-divider {
-  border-image: linear-gradient(to right, transparent, rgba(255,255,255,0.2), transparent) 1;
+  background: linear-gradient(to right, transparent, #6366f1 20%, #a78bfa 50%, #6366f1 80%, transparent);
+  opacity: 0.4;
+}
+.note-editor-page.dark .note-editor-content hr.note-divider::after {
+  background: #111;
+  color: #a78bfa;
 }
 
 /* ── Code block ── */
 .note-editor-content pre.note-code {
   background: #0d1117;
   border: 1px solid #30363d;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  margin: 1rem 0;
+  border-radius: 10px;
+  padding: 0;
+  margin: 1.25rem 0;
   font-family: 'Courier New', 'Consolas', 'Menlo', monospace;
   font-size: 0.875rem;
   line-height: 1.6;
   color: #e6edf3;
   white-space: pre-wrap;
   word-break: break-all;
-  overflow-x: auto;
+  overflow: hidden;
   outline: none;
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
-/* little "code" label top-right */
-.note-editor-content pre.note-code::before {
-  content: 'code';
-  position: absolute;
-  top: 0.4rem;
-  right: 0.75rem;
-  font-size: 0.65rem;
+
+/* Real DOM header bar */
+.note-code-header {
+  display: block;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  border-radius: 10px 10px 0 0;
+  padding: 0.45rem 1rem;
+  font-size: 0.7rem;
   font-weight: 600;
-  color: #6e7681;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: #8b949e;
+  letter-spacing: 0.04em;
+  font-family: 'Courier New', 'Consolas', 'Menlo', monospace;
+  user-select: none;
   pointer-events: none;
+  flex-shrink: 0;
+  /* prevent contenteditable from putting cursor here */
+  -webkit-user-modify: read-only;
+}
+.note-editor-page.dark .note-code-header {
+  background: #0a0f16;
+  border-bottom-color: rgba(255,255,255,0.08);
+}
+
+/* Remove old ::before header — no longer used */
+.note-editor-content pre.note-code::before { display: none; content: none; }
+
+/* Code text area — the actual editable content */
+.note-editor-content pre.note-code .note-code-body {
+  display: block;
+  padding: 1rem 1.25rem 1.1rem;
+  outline: none;
+  min-height: 2.5em;
+  white-space: pre-wrap;
+  word-break: break-all;
+  flex: 1;
+}
+
+/* After highlight.js runs it wraps in <code class="hljs"> */
+.note-editor-content pre.note-code .hljs {
+  display: block;
+  padding: 1rem 1.25rem 1.1rem;
+  background: transparent;
+  font-size: inherit;
+  line-height: inherit;
   font-family: inherit;
 }
-/* Placeholder for empty code block */
-.note-editor-content pre.note-code:empty::before {
-  content: 'Enter code here…';
+
+/* Placeholder for empty code body */
+.note-editor-content pre.note-code .note-code-body:empty::before {
+  content: attr(data-placeholder);
   color: #6e7681;
   pointer-events: none;
-  font-size: 0.875rem;
-  text-transform: none;
-  letter-spacing: 0;
-  font-weight: 400;
-  top: unset;
-  right: unset;
-  position: static;
+  font-style: normal;
 }
 
 /* ── Floating toolbar ── */
@@ -426,5 +478,5 @@
   .note-theme-btn { padding: 0.35rem 0.45rem; font-size: 0.9rem; }
   .note-back-btn { padding: 0.35rem 0.6rem; font-size: 0.78rem; }
   .note-save-status { min-width: 16px; font-size: 0.7rem; }
-  .note-editor-content pre.note-code { font-size: 0.8rem; padding: 0.75rem; }
+  .note-editor-content pre.note-code { font-size: 0.8rem; }
 }
