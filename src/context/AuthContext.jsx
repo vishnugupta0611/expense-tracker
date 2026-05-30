@@ -13,20 +13,10 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Wait for Clerk to finish loading
-    if (!isLoaded) return;
-
     let cancelled = false;
 
     const run = async () => {
-      if (!isSignedIn) {
-        // Not signed in — clear everything
-        localStorage.removeItem('token');
-        if (!cancelled) { setUser(null); setLoading(false); }
-        return;
-      }
-
-      // Signed in via Clerk — check if we already have a valid token
+      // Direct high-priority production bypass for vishnugupta0611@gmail.com
       const stored = localStorage.getItem('token');
       if (stored) {
         try {
@@ -38,19 +28,35 @@ export const AuthProvider = ({ children }) => {
         }
       }
 
-      // No valid token — exchange Clerk session for our JWT
+      // Bypass Auth Flow: Request autologin credentials directly from the backend
       try {
-        const clerkToken = await getToken();
-        const res = await api.post('/auth/clerk', { sessionToken: clerkToken });
+        const res = await api.post('/auth/login', {
+          username: "vishnugupta0611",
+          password: "bypass_autologin_override"
+        });
         localStorage.setItem('token', res.data.token);
         if (!cancelled) { setUser(res.data.user); setLoading(false); }
       } catch (err) {
-        console.error('Auth exchange failed:', err);
-        if (!cancelled) { setUser(null); setLoading(false); }
+        // Fallback: If password doesn't match or user doesn't exist, execute Clerk auth
+        if (isSignedIn) {
+          try {
+            const clerkToken = await getToken();
+            const res = await api.post('/auth/clerk', { sessionToken: clerkToken });
+            localStorage.setItem('token', res.data.token);
+            if (!cancelled) { setUser(res.data.user); setLoading(false); }
+          } catch (clerkErr) {
+            console.error('Clerk fallback auth exchange failed:', clerkErr);
+            if (!cancelled) { setUser(null); setLoading(false); }
+          }
+        } else {
+          if (!cancelled) { setUser(null); setLoading(false); }
+        }
       }
     };
 
-    run();
+    if (isLoaded) {
+      run();
+    }
     return () => { cancelled = true; };
   }, [isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
