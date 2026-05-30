@@ -33,11 +33,12 @@
   font-size: 1.5rem;
 }
 
-.auth-logo-text {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  letter-spacing: -0.5px;
+.auth-logo-img {
+  height: 64px;
+  width: auto;
+  object-fit: contain;
+  mix-blend-mode: multiply;
+  background: transparent;
 }
 
 /* Tabs */
@@ -174,4 +175,24 @@
     padding: 1.5rem;
     border-radius: var(--radius-lg);
   }
+}
+
+/* ── Clerk SignIn wrapper ── */
+.auth-clerk-wrap {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* Override Clerk card to match app style */
+.clerk-root { width: 100%; }
+.clerk-card {
+  background: var(--card-bg) !important;
+  border: 1px solid var(--border-light) !important;
+  border-radius: var(--radius-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+  width: 100% !important;
 }

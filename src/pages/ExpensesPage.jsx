@@ -216,7 +216,7 @@ const ExpensesPage = () => {
   return (
     <div className="expenses-page">
       <div className="expenses-header">
-        <h1>Expenses</h1>
+        <img src="/animation.gif" alt="Logo" className="expenses-header-logo" />
         <div className="header-actions">
           <button className="mobile-analytics-btn" onClick={() => window.location.href = '/wallet'}>
             <span className="analytics-icon">💰</span>

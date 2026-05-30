@@ -61,7 +61,9 @@ const NotesPage = () => {
       </header>
 
       {loading ? (
-        <div className="notes-loading"><div className="spinner" /></div>
+        <div className="notes-loading">
+          <img src="/animation.gif" alt="Loading" style={{ width: 70, height: 70, objectFit: 'contain' }} />
+        </div>
       ) : notes.length === 0 ? (
         <div className="notes-empty">
           <div className="notes-empty-icon">📝</div>

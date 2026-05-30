@@ -4,36 +4,33 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const api = axios.create({
   baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
 });
 
-// Add token to requests
+// Attach our JWT to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error),
 );
 
-// Handle errors
+// On 401 — only redirect if it's NOT an auth endpoint (avoid redirect loops)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      console.warn('Unauthorized! Logging out...');
+    const url = error.config?.url || '';
+    const is401 = error.response?.status === 401;
+    const isAuthEndpoint = url.includes('/auth/');
+
+    if (is401 && !isAuthEndpoint) {
       localStorage.removeItem('token');
-      window.location.href = '/';
+      window.location.href = '/auth';
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export default api;
