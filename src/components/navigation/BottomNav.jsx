@@ -5,23 +5,26 @@ const BottomNav = () => {
   const location = useLocation();
 
   // Hide bottom nav on full-screen pages
-  const hidden = location.pathname.startsWith('/notes') || location.pathname.startsWith('/p/notes') || location.pathname.startsWith('/words');
+  const hidden = location.pathname.startsWith('/notes') || 
+                 location.pathname.startsWith('/p/notes') || 
+                 location.pathname.startsWith('/words') ||
+                 location.pathname.startsWith('/family/messages');
   if (hidden) return null;
 
   const navItems = [
     { path: '/expenses', icon: '💰', label: 'Expenses' },
-    { path: '/spaces', icon: '👥', label: 'Spaces' },
+    { path: '/family', icon: '👨‍👩‍👧‍👦', label: 'Family' },
     { path: '/shopping', icon: '🛒', label: 'Shopping' },
     { path: '/profile', icon: '👤', label: 'Profile' }
   ];
 
+  const isFamilyPage = location.pathname.startsWith('/family');
+
   return (
-    <nav className="bottom-nav">
+    <nav className={`bottom-nav ${isFamilyPage ? 'family-theme' : ''}`}>
       {navItems.map((item) => {
-        const isActive = item.path === '/spaces' 
-          ? location.pathname.startsWith('/spaces')
-          : item.path === '/history'
-          ? location.pathname === '/history'
+        const isActive = item.path === '/family' 
+          ? location.pathname.startsWith('/family')
           : location.pathname === item.path;
         
         return (

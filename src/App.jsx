@@ -27,6 +27,8 @@ const NotePublicPage     = lazy(() => import('./pages/NotePublicPage'));
 const DrivePage          = lazy(() => import('./pages/DrivePage'));
 const WordLibraryPage    = lazy(() => import('./pages/WordLibraryPage'));
 const WalletPage         = lazy(() => import('./pages/WalletPage'));
+const FamilyLinkPage     = lazy(() => import('./pages/FamilyLinkPage'));
+const FamilyMessagesPage = lazy(() => import('./pages/FamilyMessagesPage'));
 
 const LoadingScreen = () => (
   <div style={{
@@ -71,7 +73,8 @@ const AppContent = () => {
           <Route path="/history"              element={<ProtectedRoute><HistoryPage /></ProtectedRoute>} />
           <Route path="/schedule"             element={<ProtectedRoute><SchedulePage /></ProtectedRoute>} />
           <Route path="/todo"                 element={<ProtectedRoute><TodoPage /></ProtectedRoute>} />
-       
+          <Route path="/family"               element={<ProtectedRoute><FamilyLinkPage /></ProtectedRoute>} />
+          <Route path="/family/messages"      element={<ProtectedRoute><FamilyMessagesPage /></ProtectedRoute>} />
           <Route path="/notes"                element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
           <Route path="/notes/:id"            element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
           <Route path="/p/notes/:id"          element={<NotePublicPage />} />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import api from '@services/api.js';
 import QuickAddInput from '@components/expenses/QuickAddInput';
 import BudgetProgress from '@components/expenses/BudgetProgress';
@@ -10,6 +11,7 @@ const CATEGORY_EMOJI = {
 };
 
 const ExpensesPage = () => {
+  const [activeTab, setActiveTab] = useState('expenses');
   const [categories, setCategories] = useState([]);
   const [todayTotal, setTodayTotal] = useState(0);
   const [weeklyTotal, setWeeklyTotal] = useState(0);
@@ -17,19 +19,15 @@ const ExpensesPage = () => {
   const [expenses, setExpenses] = useState([]);
   const [spaces, setSpaces] = useState([]);
 
-  // Pagination state
   const [nextCursor, setNextCursor] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const loadingRef = useRef(false); // ref guard to avoid stale closure issues
-
-  // Initial load state — only block UI on very first load
+  const loadingRef = useRef(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
   const sentinelRef = useRef(null);
   const observerRef = useRef(null);
 
-  // ── Sidebar data (non-blocking) ──────────────────────────────────────────
   const fetchSidebarData = useCallback(async () => {
     const defaultCategories = ['Food', 'Transport', 'Bills', 'Grocery', 'Entertainment', 'Other'];
     try {
@@ -45,11 +43,9 @@ const ExpensesPage = () => {
       setTodayTotal(todayRes.data.total || 0);
       setBudgetStatus(budgetRes.data);
 
-      // Set spaces immediately, then enrich with balances in background
       const spacesData = spacesRes.data.spaces || spacesRes.data || [];
       setSpaces(spacesData.map(s => ({ ...s, userBalance: { balance: 0, status: 'settled', amount: 0 } })));
 
-      // Enrich balances without blocking
       spacesData.forEach(async (space) => {
         try {
           const r = await api.get(`/spaces/${space._id}/balance`);
@@ -62,7 +58,6 @@ const ExpensesPage = () => {
     }
   }, []);
 
-  // ── Paginated expense loader ─────────────────────────────────────────────
   const loadExpenses = useCallback(async (cursor = null) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -94,12 +89,10 @@ const ExpensesPage = () => {
       loadingRef.current = false;
       setLoadingMore(false);
     }
-  }, []); // stable — uses ref for guard
+  }, []);
 
-  // ── Initial load ─────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      // Load expenses + sidebar in parallel — don't wait for sidebar
       fetchSidebarData();
       await loadExpenses(null);
       setInitialLoading(false);
@@ -108,7 +101,6 @@ const ExpensesPage = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Intersection Observer ────────────────────────────────────────────────
   useEffect(() => {
     if (observerRef.current) observerRef.current.disconnect();
 
@@ -125,11 +117,9 @@ const ExpensesPage = () => {
     return () => observerRef.current?.disconnect();
   }, [hasMore, nextCursor, loadExpenses]);
 
-  // ── Optimistic add ───────────────────────────────────────────────────────
   const handleExpenseAdded = useCallback((newExpense) => {
     if (!newExpense) return;
 
-    // Replace optimistic entry with real server entry
     if (newExpense._replaceOptimistic) {
       setExpenses(prev =>
         prev.map(e => e._id === newExpense._replaceOptimistic ? { ...newExpense, _optimistic: false } : e)
@@ -137,7 +127,6 @@ const ExpensesPage = () => {
       return;
     }
 
-    // Remove failed optimistic entry
     if (newExpense._removeOptimistic) {
       setExpenses(prev => prev.filter(e => e._id !== newExpense._removeOptimistic));
       const removed = expenses.find(e => e._id === newExpense._removeOptimistic);
@@ -150,7 +139,6 @@ const ExpensesPage = () => {
       return;
     }
 
-    // Add new (optimistic or real)
     setExpenses(prev => [newExpense, ...prev]);
     const isToday = new Date(newExpense.date).toDateString() === new Date().toDateString();
     const isThisWeek = new Date(newExpense.date) >= new Date(new Date().setDate(new Date().getDate() - 7));
@@ -158,10 +146,8 @@ const ExpensesPage = () => {
     if (isThisWeek) setWeeklyTotal(prev => prev + newExpense.amount);
   }, [expenses]);
 
-  // ── Delete ───────────────────────────────────────────────────────────────
   const handleDeleteExpense = useCallback(async (id) => {
     const expense = expenses.find(e => e._id === id);
-    // Optimistic remove
     setExpenses(prev => prev.filter(e => e._id !== id));
     if (expense) {
       const isToday = new Date(expense.date).toDateString() === new Date().toDateString();
@@ -177,7 +163,6 @@ const ExpensesPage = () => {
     }
   }, [expenses]);
 
-  // ── Group by date ────────────────────────────────────────────────────────
   const groupExpensesByDate = (list) => {
     const groups = {};
     list.forEach((expense) => {
@@ -229,149 +214,230 @@ const ExpensesPage = () => {
         </div>
       </div>
 
-      <div className="expenses-layout">
-        {/* Left Sidebar */}
-        <div className="expenses-sidebar">
-          <div className="spending-summary">
-            <div className="summary-card">
-              <span className="summary-label">Today</span>
-              <span className="summary-amount">₹{todayTotal.toFixed(0)}</span>
+      {/* Tab Navigation */}
+      <div className="expenses-tabs">
+        <button
+          className={`tab-btn ${activeTab === 'expenses' ? 'active' : ''}`}
+          onClick={() => setActiveTab('expenses')}
+        >
+          <span className="tab-icon">💰</span>
+          <span className="tab-label">Expenses</span>
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'spaces' ? 'active' : ''}`}
+          onClick={() => setActiveTab('spaces')}
+        >
+          <span className="tab-icon">👥</span>
+          <span className="tab-label">Spaces</span>
+        </button>
+      </div>
+
+      {/* Expenses Tab */}
+      {activeTab === 'expenses' && (
+        <div className="expenses-layout"> {/* ✅ wrapper added — fixes the two-sibling JSX error */}
+
+          {/* Left Sidebar */}
+          <div className="expenses-sidebar">
+            <div className="spending-summary">
+              <div className="summary-card">
+                <span className="summary-label">Today</span>
+                <span className="summary-amount">₹{todayTotal.toFixed(0)}</span>
+              </div>
+              <div className="summary-card">
+                <span className="summary-label">This Week</span>
+                <span className="summary-amount">₹{weeklyTotal.toFixed(0)}</span>
+              </div>
             </div>
-            <div className="summary-card">
-              <span className="summary-label">This Week</span>
-              <span className="summary-amount">₹{weeklyTotal.toFixed(0)}</span>
+
+            <BudgetProgress budgetStatus={budgetStatus} />
+
+            {spaces.length > 0 ? (
+              spaces.map((space) => (
+                <div key={space._id} className="space-sharing">
+                  <h4>Space Sharing</h4>
+                  <div className="sharing-status">
+                    <div className="space-name-header">
+                      <span className="space-icon">🏠</span>
+                      <span className="space-name">{space.name}</span>
+                    </div>
+                    {space.userBalance && space.userBalance.status !== 'settled' ? (
+                      <div className={`sharing-alert ${space.userBalance.status === 'owed' ? 'positive' : 'negative'}`}>
+                        <span className="sharing-icon">{space.userBalance.status === 'owed' ? '💰' : '💸'}</span>
+                        <div className="sharing-text">
+                          <span className="sharing-label">
+                            {space.userBalance.status === 'owed' ? 'Others will pay you' : 'You need to pay others'}
+                          </span>
+                          <span className="sharing-amount">₹{space.userBalance.amount.toFixed(0)}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="sharing-alert settled">
+                        <span className="sharing-icon">✅</span>
+                        <div className="sharing-text">
+                          <span className="sharing-label">All settled!</span>
+                          <span className="sharing-amount">₹0</span>
+                        </div>
+                      </div>
+                    )}
+                    <button className="view-space-btn" onClick={() => window.location.href = `/spaces/${space._id}`}>
+                      View {space.name}
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="space-sharing">
+                <h4>Space Sharing</h4>
+                <div className="sharing-status">
+                  <div className="no-spaces">
+                    <span className="no-spaces-icon">🏠</span>
+                    <span className="no-spaces-text">No shared spaces yet</span>
+                    <button className="create-space-btn" onClick={() => window.location.href = '/spaces'}>
+                      Create Space
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Right Main */}
+          <div className="expenses-main">
+            <QuickAddInput categories={categories} onExpenseAdded={handleExpenseAdded} />
+
+            <div className="expenses-timeline">
+              <div className="timeline-header">
+                <h3 className="timeline-title">Recent Expenses</h3>
+                <div className="timeline-summary">
+                  <span className="expense-count">{expenses.length} expenses</span>
+                  <span className="expense-total">₹{totalExpenses.toFixed(0)}</span>
+                </div>
+              </div>
+
+              {Object.keys(groupedExpenses).length === 0 ? (
+                <div className="no-expenses">
+                  <p>No expenses yet. Add your first expense above!</p>
+                </div>
+              ) : (
+                Object.entries(groupedExpenses).map(([date, dateExpenses]) => (
+                  <div key={date} className="expense-group">
+                    <div className="expense-date-header">
+                      <h4 className="expense-date">{date}</h4>
+                      <span className="date-total">
+                        ₹{dateExpenses.reduce((sum, e) => sum + e.amount, 0).toFixed(0)}
+                      </span>
+                    </div>
+                    {dateExpenses.map((expense) => (
+                      <div
+                        key={expense._id}
+                        className={`expense-item${expense._optimistic ? ' optimistic' : ''}`}
+                      >
+                        <div className="expense-icon">
+                          {CATEGORY_EMOJI[expense.category] || '🏷️'}
+                        </div>
+                        <div className="expense-info">
+                          <span className="expense-title">
+                            {expense.description || expense.category}
+                          </span>
+                          <span className="expense-time">
+                            {new Date(expense.date).toLocaleTimeString('en-IN', {
+                              hour: '2-digit', minute: '2-digit',
+                            })}
+                          </span>
+                        </div>
+                        <div className="expense-actions">
+                          <span className="expense-amount">₹{expense.amount.toFixed(0)}</span>
+                          {!expense._optimistic && (
+                            <button
+                              className="delete-btn"
+                              onClick={() => handleDeleteExpense(expense._id)}
+                              title="Delete expense"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))
+              )}
+
+              <div ref={sentinelRef} className="scroll-sentinel" />
+
+              {loadingMore && (
+                <div className="load-more-indicator">
+                  <span className="load-dot" /><span className="load-dot" /><span className="load-dot" />
+                </div>
+              )}
+
+              {!hasMore && expenses.length > 0 && (
+                <p className="all-loaded">All expenses loaded</p>
+              )}
             </div>
           </div>
 
-          <BudgetProgress budgetStatus={budgetStatus} />
+        </div> {/* ✅ closes expenses-layout */}
+      )}
 
-          {spaces.length > 0 ? (
-            spaces.map((space) => (
-              <div key={space._id} className="space-sharing">
-                <h4>Space Sharing</h4>
-                <div className="sharing-status">
-                  <div className="space-name-header">
-                    <span className="space-icon">🏠</span>
-                    <span className="space-name">{space.name}</span>
+      {/* Spaces Tab */}
+      {activeTab === 'spaces' && (
+        <div className="spaces-tab-content">
+          <div className="spaces-grid">
+            {spaces.length > 0 ? (
+              spaces.map((space) => (
+                <div key={space._id} className="space-card">
+                  <div className="space-card-header">
+                    <h3 className="space-card-title">🏠 {space.name}</h3>
+                    <button
+                      className="space-card-action"
+                      onClick={() => window.location.href = `/spaces/${space._id}`}
+                    >
+                      →
+                    </button>
                   </div>
+
                   {space.userBalance && space.userBalance.status !== 'settled' ? (
-                    <div className={`sharing-alert ${space.userBalance.status === 'owed' ? 'positive' : 'negative'}`}>
-                      <span className="sharing-icon">{space.userBalance.status === 'owed' ? '💰' : '💸'}</span>
-                      <div className="sharing-text">
-                        <span className="sharing-label">
-                          {space.userBalance.status === 'owed' ? 'Others will pay you' : 'You need to pay others'}
-                        </span>
-                        <span className="sharing-amount">₹{space.userBalance.amount.toFixed(0)}</span>
+                    <div className={`space-status ${space.userBalance.status === 'owed' ? 'owed' : 'owing'}`}>
+                      <span className="status-icon">
+                        {space.userBalance.status === 'owed' ? '💰' : '💸'}
+                      </span>
+                      <div className="status-info">
+                        <p className="status-label">
+                          {space.userBalance.status === 'owed' ? 'You are owed' : 'You owe'}
+                        </p>
+                        <p className="status-amount">₹{space.userBalance.amount.toFixed(0)}</p>
                       </div>
                     </div>
                   ) : (
-                    <div className="sharing-alert settled">
-                      <span className="sharing-icon">✅</span>
-                      <div className="sharing-text">
-                        <span className="sharing-label">All settled!</span>
-                        <span className="sharing-amount">₹0</span>
+                    <div className="space-status settled">
+                      <span className="status-icon">✅</span>
+                      <div className="status-info">
+                        <p className="status-label">All settled</p>
                       </div>
                     </div>
                   )}
-                  <button className="view-space-btn" onClick={() => window.location.href = `/spaces/${space._id}`}>
-                    View {space.name}
-                  </button>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="space-sharing">
-              <h4>Space Sharing</h4>
-              <div className="sharing-status">
-                <div className="no-spaces">
-                  <span className="no-spaces-icon">🏠</span>
-                  <span className="no-spaces-text">No shared spaces yet</span>
-                  <button className="create-space-btn" onClick={() => window.location.href = '/spaces'}>
-                    Create Space
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Right Main */}
-        <div className="expenses-main">
-          <QuickAddInput categories={categories} onExpenseAdded={handleExpenseAdded} />
-
-          <div className="expenses-timeline">
-            <div className="timeline-header">
-              <h3 className="timeline-title">Recent Expenses</h3>
-              <div className="timeline-summary">
-                <span className="expense-count">{expenses.length} expenses</span>
-                <span className="expense-total">₹{totalExpenses.toFixed(0)}</span>
-              </div>
-            </div>
-
-            {Object.keys(groupedExpenses).length === 0 ? (
-              <div className="no-expenses">
-                <p>No expenses yet. Add your first expense above!</p>
-              </div>
-            ) : (
-              Object.entries(groupedExpenses).map(([date, dateExpenses]) => (
-                <div key={date} className="expense-group">
-                  <div className="expense-date-header">
-                    <h4 className="expense-date">{date}</h4>
-                    <span className="date-total">
-                      ₹{dateExpenses.reduce((sum, e) => sum + e.amount, 0).toFixed(0)}
-                    </span>
-                  </div>
-                  {dateExpenses.map((expense) => (
-                    <div
-                      key={expense._id}
-                      className={`expense-item${expense._optimistic ? ' optimistic' : ''}`}
-                    >
-                      <div className="expense-icon">
-                        {CATEGORY_EMOJI[expense.category] || '🏷️'}
-                      </div>
-                      <div className="expense-info">
-                        <span className="expense-title">
-                          {expense.description || expense.category}
-                        </span>
-                        <span className="expense-time">
-                          {new Date(expense.date).toLocaleTimeString('en-IN', {
-                            hour: '2-digit', minute: '2-digit',
-                          })}
-                        </span>
-                      </div>
-                      <div className="expense-actions">
-                        <span className="expense-amount">₹{expense.amount.toFixed(0)}</span>
-                        {!expense._optimistic && (
-                          <button
-                            className="delete-btn"
-                            onClick={() => handleDeleteExpense(expense._id)}
-                            title="Delete expense"
-                          >
-                            ×
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                  <Link to={`/spaces/${space._id}`} className="space-card-link">
+                    View Details
+                  </Link>
                 </div>
               ))
-            )}
-
-            {/* Intersection sentinel */}
-            <div ref={sentinelRef} className="scroll-sentinel" />
-
-            {loadingMore && (
-              <div className="load-more-indicator">
-                <span className="load-dot" /><span className="load-dot" /><span className="load-dot" />
+            ) : (
+              <div className="no-spaces-container">
+                <div className="no-spaces-content">
+                  <span className="no-spaces-emoji">🏠</span>
+                  <h3>No Shared Spaces Yet</h3>
+                  <p>Create a space to share expenses with family or friends</p>
+                  <Link to="/spaces" className="create-space-btn">
+                    Create Space
+                  </Link>
+                </div>
               </div>
-            )}
-
-            {!hasMore && expenses.length > 0 && (
-              <p className="all-loaded">All expenses loaded</p>
             )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
