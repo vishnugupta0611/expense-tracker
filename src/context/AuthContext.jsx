@@ -16,41 +16,43 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false;
 
     const run = async () => {
-      // Direct high-priority production bypass for vishnugupta0611@gmail.com
       const stored = localStorage.getItem('token');
+
       if (stored) {
         try {
           const r = await api.get('/auth/me');
-          if (!cancelled) { setUser(r.data.user); setLoading(false); }
+          if (!cancelled) {
+            setUser(r.data.user);
+            setLoading(false);
+          }
           return;
         } catch {
           localStorage.removeItem('token');
         }
       }
 
-      // Bypass Auth Flow: Request autologin credentials directly from the backend
-      try {
-        const res = await api.post('/auth/login', {
-          username: "vishnugupta0611",
-          password: "bypass_autologin_override"
-        });
-        localStorage.setItem('token', res.data.token);
-        if (!cancelled) { setUser(res.data.user); setLoading(false); }
-      } catch (err) {
-        // Fallback: If password doesn't match or user doesn't exist, execute Clerk auth
-        if (isSignedIn) {
-          try {
-            const clerkToken = await getToken();
-            const res = await api.post('/auth/clerk', { sessionToken: clerkToken });
-            localStorage.setItem('token', res.data.token);
-            if (!cancelled) { setUser(res.data.user); setLoading(false); }
-          } catch (clerkErr) {
-            console.error('Clerk fallback auth exchange failed:', clerkErr);
-            if (!cancelled) { setUser(null); setLoading(false); }
+      if (isSignedIn) {
+        try {
+          const clerkToken = await getToken();
+          const res = await api.post('/auth/clerk', { sessionToken: clerkToken });
+          localStorage.setItem('token', res.data.token);
+          if (!cancelled) {
+            setUser(res.data.user);
+            setLoading(false);
           }
-        } else {
-          if (!cancelled) { setUser(null); setLoading(false); }
+        } catch (clerkErr) {
+          console.error('Clerk auth exchange failed:', clerkErr);
+          if (!cancelled) {
+            setUser(null);
+            setLoading(false);
+          }
         }
+        return;
+      }
+
+      if (!cancelled) {
+        setUser(null);
+        setLoading(false);
       }
     };
 
