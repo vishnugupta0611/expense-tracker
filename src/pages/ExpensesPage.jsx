@@ -377,7 +377,7 @@ const ExpensesPage = () => {
             </div>
           </div>
 
-        </div> {/* ✅ closes expenses-layout */}
+        </div>
       )}
 
       {/* Spaces Tab */}
