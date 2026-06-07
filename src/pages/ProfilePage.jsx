@@ -13,7 +13,9 @@ const ProfilePage = () => {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [monthlyBudget, setMonthlyBudget] = useState(user?.budgets?.monthly || 0);
   const [dailyBudget, setDailyBudget] = useState(user?.budgets?.daily || 0);
-  const [defaultView, setDefaultView] = useState(user?.defaultView || 'expenses');
+  const [defaultView, setDefaultView] = useState(
+    localStorage.getItem('defaultView') || 'family'
+  );
 
   const [spaces, setSpaces] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -59,9 +61,11 @@ const ProfilePage = () => {
     setSaving(true);
     setMessage({ type: '', text: '' });
     try {
+      // Save defaultView locally only
+      localStorage.setItem('defaultView', defaultView);
+
       const response = await api.put('/users/profile', {
         name,
-        defaultView,
         avatar: selectedAvatar,
         budgets: {
           monthly: Number(monthlyBudget),
@@ -186,11 +190,11 @@ const ProfilePage = () => {
           <div className="field-row">
             <label>Default view</label>
             <select value={defaultView} onChange={(e) => setDefaultView(e.target.value)}>
-              <option value="expenses">Personal Expenses</option>
-              <option value="spaces">All Spaces</option>
-              {spaces.map(space => (
-                <option key={space._id} value={space._id}>{space.name}</option>
-              ))}
+              <option value="family">Family</option>
+              <option value="expenses">Expenses</option>
+              <option value="drive">Drive</option>
+              <option value="notes">Notes</option>
+              <option value="words">Word Library</option>
             </select>
           </div>
         </div>

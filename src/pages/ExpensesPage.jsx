@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '@services/api.js';
 import QuickAddInput from '@components/expenses/QuickAddInput';
 import BudgetProgress from '@components/expenses/BudgetProgress';
@@ -11,6 +11,7 @@ const CATEGORY_EMOJI = {
 };
 
 const ExpensesPage = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('expenses');
   const [categories, setCategories] = useState([]);
   const [todayTotal, setTodayTotal] = useState(0);
@@ -203,11 +204,11 @@ const ExpensesPage = () => {
       <div className="expenses-header">
         <img src="/animation.gif" alt="Logo" className="expenses-header-logo" />
         <div className="header-actions">
-          <button className="mobile-analytics-btn" onClick={() => window.location.href = '/wallet'}>
+          <button className="mobile-analytics-btn" onClick={() => navigate('/wallet')}>
             <span className="analytics-icon">💰</span>
             <span className="analytics-text">Wallet</span>
           </button>
-          <button className="mobile-analytics-btn" onClick={() => window.location.href = '/analytics'}>
+          <button className="mobile-analytics-btn" onClick={() => navigate('/analytics')}>
             <span className="analytics-icon">📊</span>
             <span className="analytics-text">Analytics</span>
           </button>
@@ -279,7 +280,7 @@ const ExpensesPage = () => {
                         </div>
                       </div>
                     )}
-                    <button className="view-space-btn" onClick={() => window.location.href = `/spaces/${space._id}`}>
+                    <button className="view-space-btn" onClick={() => navigate(`/spaces/${space._id}`)}>
                       View {space.name}
                     </button>
                   </div>
@@ -292,7 +293,7 @@ const ExpensesPage = () => {
                   <div className="no-spaces">
                     <span className="no-spaces-icon">🏠</span>
                     <span className="no-spaces-text">No shared spaces yet</span>
-                    <button className="create-space-btn" onClick={() => window.location.href = '/spaces'}>
+                    <button className="create-space-btn" onClick={() => navigate('/spaces')}>
                       Create Space
                     </button>
                   </div>
@@ -383,22 +384,21 @@ const ExpensesPage = () => {
       {/* Spaces Tab */}
       {activeTab === 'spaces' && (
         <div className="spaces-tab-content">
-          <div className="spaces-grid">
+          <div className="spaces-tab-grid">
             {spaces.length > 0 ? (
               spaces.map((space) => (
-                <div key={space._id} className="space-card">
-                  <div className="space-card-header">
-                    <h3 className="space-card-title">🏠 {space.name}</h3>
-                    <button
-                      className="space-card-action"
-                      onClick={() => window.location.href = `/spaces/${space._id}`}
-                    >
-                      →
-                    </button>
+                <div
+                  key={space._id}
+                  className="space-tab-card"
+                  onClick={() => navigate(`/spaces/${space._id}`)}
+                >
+                  <div className="space-tab-card-header">
+                    <h3 className="space-tab-card-title">🏠 {space.name}</h3>
+                    <span className="space-tab-arrow">→</span>
                   </div>
 
                   {space.userBalance && space.userBalance.status !== 'settled' ? (
-                    <div className={`space-status ${space.userBalance.status === 'owed' ? 'owed' : 'owing'}`}>
+                    <div className={`space-tab-status ${space.userBalance.status === 'owed' ? 'owed' : 'owing'}`}>
                       <span className="status-icon">
                         {space.userBalance.status === 'owed' ? '💰' : '💸'}
                       </span>
@@ -410,17 +410,13 @@ const ExpensesPage = () => {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-status settled">
+                    <div className="space-tab-status settled">
                       <span className="status-icon">✅</span>
                       <div className="status-info">
                         <p className="status-label">All settled</p>
                       </div>
                     </div>
                   )}
-
-                  <Link to={`/spaces/${space._id}`} className="space-card-link">
-                    View Details
-                  </Link>
                 </div>
               ))
             ) : (
@@ -429,9 +425,9 @@ const ExpensesPage = () => {
                   <span className="no-spaces-emoji">🏠</span>
                   <h3>No Shared Spaces Yet</h3>
                   <p>Create a space to share expenses with family or friends</p>
-                  <Link to="/spaces" className="create-space-btn">
+                  <button className="create-space-btn" onClick={() => navigate('/spaces')}>
                     Create Space
-                  </Link>
+                  </button>
                 </div>
               </div>
             )}

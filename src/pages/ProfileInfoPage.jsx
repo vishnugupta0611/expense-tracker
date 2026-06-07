@@ -235,13 +235,6 @@ const ProfileInfoPage = () => {
               className="composer-input"
             />
 
-            <div className="composer-actions">
-              <button type="button" className="upload-btn" onClick={openPicker}>Add Photos / Video</button>
-              <button type="button" className="post-btn" onClick={addPost} disabled={isPosting || selectedFiles.length === 0}>
-                {isPosting ? 'Posting...' : 'Post'}
-              </button>
-            </div>
-
             <div className="frame-type-row">
               <span className="frame-type-label">Photo shape</span>
               <div className="frame-type-group">
@@ -252,11 +245,17 @@ const ProfileInfoPage = () => {
                     className={`frame-chip ${frameType === option.value ? 'active' : ''}`}
                     onClick={() => changeFrameType(option.value)}
                   >
-                    <strong>{option.label}</strong>
-                    <span>{option.helper}</span>
+                    {option.label}
                   </button>
                 ))}
               </div>
+            </div>
+
+            <div className="composer-actions">
+              <button type="button" className="upload-btn" onClick={openPicker}>Add Photos / Video</button>
+              <button type="button" className="post-btn" onClick={addPost} disabled={isPosting || selectedFiles.length === 0}>
+                {isPosting ? 'Posting...' : 'Post'}
+              </button>
             </div>
 
             <input

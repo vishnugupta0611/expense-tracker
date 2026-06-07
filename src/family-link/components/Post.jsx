@@ -140,6 +140,7 @@ const FamilyPostList = ({
   const [pendingLikes, setPendingLikes] = useState({});
   const [pendingComments, setPendingComments] = useState({});
   const [openMenus, setOpenMenus] = useState({});
+  const [likeAnimate, setLikeAnimate] = useState({});
 
   const postItems = posts || localPosts;
   const updatePosts = onPostsChange || setLocalPosts;
@@ -159,6 +160,10 @@ const FamilyPostList = ({
 
     const likes = post.likes || [];
     const liked = likes.some((like) => getUserId(like.userId) === user.id);
+
+    // Trigger pop animation
+    setLikeAnimate((prev) => ({ ...prev, [postId]: true }));
+    setTimeout(() => setLikeAnimate((prev) => ({ ...prev, [postId]: false })), 400);
 
     updatePost(postId, (item) => ({
       ...item,
@@ -190,33 +195,39 @@ const FamilyPostList = ({
     const text = commentText[postId]?.trim();
     if (!postId || !text || pendingComments[postId]) return;
 
-    if (!post._id) {
-      updatePost(postId, (item) => ({
-        ...item,
-        comments: [
-          ...(item.comments || []),
-          {
-            id: `comment-${Date.now()}`,
-            userId: user.id,
-            text,
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }));
-      setCommentText((prev) => ({ ...prev, [postId]: '' }));
-      return;
-    }
+    // Optimistic: show comment immediately
+    const optimisticComment = {
+      commentId: `optimistic-${Date.now()}`,
+      userId: { name: user.name, avatar: user.avatar, _id: user.id },
+      text,
+      createdAt: new Date().toISOString(),
+      _optimistic: true,
+    };
+
+    updatePost(postId, (item) => ({
+      ...item,
+      comments: [...(item.comments || []), optimisticComment],
+    }));
+    setCommentText((prev) => ({ ...prev, [postId]: '' }));
+
+    if (!post._id) return;
 
     setPendingComments((prev) => ({ ...prev, [postId]: true }));
 
     try {
       const response = await api.post(`/family-posts/${postId}/comments`, { text });
+      // Replace optimistic comment with real data from server
       updatePost(postId, (item) => ({
         ...item,
-        comments: response.data.comments || item.comments,
+        comments: response.data.comments || item.comments.filter((c) => !c._optimistic),
       }));
-      setCommentText((prev) => ({ ...prev, [postId]: '' }));
     } catch (error) {
+      // Rollback optimistic comment on failure
+      updatePost(postId, (item) => ({
+        ...item,
+        comments: (item.comments || []).filter((c) => c.commentId !== optimisticComment.commentId),
+      }));
+      setCommentText((prev) => ({ ...prev, [postId]: text })); // restore input
       console.error('Failed to add comment:', error.response?.data?.error || error.message);
     } finally {
       setPendingComments((prev) => ({ ...prev, [postId]: false }));
@@ -328,7 +339,7 @@ const FamilyPostList = ({
             <div className="family-post-actions">
               <button
                 type="button"
-                className={isLiked ? 'liked' : ''}
+                className={`${isLiked ? 'liked' : ''} ${likeAnimate[postId] ? 'like-animate' : ''}`}
                 aria-label={isLiked ? 'Unlike post' : 'Like post'}
                 disabled={Boolean(pendingLikes[postId])}
                 onClick={() => toggleLike(post)}
@@ -380,7 +391,7 @@ const FamilyPostList = ({
                     {comments.map((comment) => {
                       const commentUser = comment.userId?.name || comment.userId || 'Family member';
                       return (
-                        <p key={comment.commentId || comment._id || comment.id} className="family-comment">
+                        <p key={comment.commentId || comment._id || comment.id} className={`family-comment${comment._optimistic ? ' optimistic' : ''}`}>
                           <strong>{commentUser}</strong> {comment.text}
                         </p>
                       );

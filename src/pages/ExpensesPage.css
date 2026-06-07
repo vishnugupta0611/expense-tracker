@@ -1216,3 +1216,185 @@ iple Spaces Support */
   color: var(--text-tertiary);
   padding: 1rem 0 0.5rem;
 }
+
+/* ── Expenses Tabs ── */
+.expenses-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: 0.25rem;
+}
+
+.tab-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: var(--card-bg);
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+.tab-icon {
+  font-size: 1rem;
+}
+
+/* ── Spaces Tab Content ── */
+.spaces-tab-content {
+  padding-bottom: 2rem;
+}
+
+.spaces-tab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.space-tab-card {
+  background: var(--card-bg);
+  border-radius: var(--radius-lg);
+  padding: 1.25rem;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.space-tab-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
+}
+
+.space-tab-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.space-tab-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.space-tab-arrow {
+  font-size: 1.25rem;
+  color: var(--text-tertiary);
+  transition: transform 0.2s;
+}
+
+.space-tab-card:hover .space-tab-arrow {
+  transform: translateX(4px);
+  color: var(--primary);
+}
+
+.space-tab-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid;
+}
+
+.space-tab-status.owed {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.space-tab-status.owing {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.space-tab-status.settled {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.space-tab-status .status-icon {
+  font-size: 1.25rem;
+}
+
+.space-tab-status .status-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.space-tab-status .status-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.space-tab-status .status-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* No Spaces Container */
+.no-spaces-container {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1rem;
+}
+
+.no-spaces-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+  max-width: 320px;
+}
+
+.no-spaces-emoji {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.no-spaces-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.no-spaces-content p {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .spaces-tab-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .expenses-tabs {
+    margin-bottom: 1rem;
+  }
+}

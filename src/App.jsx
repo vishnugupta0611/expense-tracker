@@ -75,7 +75,7 @@ getNotificationToken();
     <div className="app">
       <Suspense fallback={<PageFallback />}>
         <Routes>
-          <Route path="/"                     element={user ? <Navigate to="/expenses" replace /> : <LandingPage />} />
+          <Route path="/"                     element={user ? <Navigate to={`/${localStorage.getItem('defaultView') || 'family'}`} replace /> : <LandingPage />} />
           <Route path="/auth"                 element={<AuthPage />} />
           <Route path="/expenses"             element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
           <Route path="/spaces"               element={<ProtectedRoute><SpacesPage /></ProtectedRoute>} />
