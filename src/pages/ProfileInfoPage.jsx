@@ -93,11 +93,11 @@ const ProfileInfoPage = () => {
       setShowSuggestions(false);
       return;
     }
-
     const timer = setTimeout(async () => {
       try {
         const response = await api.get(`/users/search?query=${encodeURIComponent(memberUsername)}`);
         setSuggestions(response.data.usernames || []);
+        console.log(response.data.usernames[0]?.email)
         setShowSuggestions(true);
       } catch (error) {
         console.error('Failed to fetch suggestions:', error);
@@ -179,7 +179,8 @@ const ProfileInfoPage = () => {
 
     setIsAddingMember(true);
     try {
-      await api.post(`/family/${user.familyKey}/add-person`, { username: memberUsername });
+      //instead of username i wanna give email to add member because email is unique but username is not unique
+      await api.post(`/family/${user.familyKey}/add-person`, { username: suggestions[0]?.email });
       setMemberUsername('');
       setShowAddMemberForm(false);
       setSuggestions([]);
@@ -301,6 +302,7 @@ const ProfileInfoPage = () => {
                 fontSize: '14px',
               }}
             >
+
               {showAddMemberForm ? 'Cancel' : '+ Add Member'}
             </button>
           </div>
