@@ -16,3 +16,14 @@
   max-width: 600px;
   box-sizing: border-box;
 }
+
+.family-scroll-sentinel {
+  width: 100%;
+  height: 1px;
+}
+
+.family-end-text {
+  color: #888;
+  font-size: 13px;
+  text-align: center;
+}

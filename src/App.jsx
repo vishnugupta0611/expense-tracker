@@ -29,6 +29,12 @@ const WordLibraryPage    = lazy(() => import('./pages/WordLibraryPage'));
 const WalletPage         = lazy(() => import('./pages/WalletPage'));
 const FamilyLinkPage     = lazy(() => import('./pages/FamilyLinkPage'));
 const FamilyMessagesPage = lazy(() => import('./pages/FamilyMessagesPage'));
+const ProfileInfoPage    = lazy(() => import('./pages/ProfileInfoPage'));
+import { useEffect } from "react";
+import { getNotificationToken } from "./getNotificationToken";
+
+
+
 
 const LoadingScreen = () => (
   <div style={{
@@ -53,7 +59,15 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AppContent = () => {
+
+  useEffect(()=>{
+
+getNotificationToken();
+
+},[]);
   const { user, loading } = useAuth();
+
+  console.log(user)
 
   if (loading) return <LoadingScreen />;
 
@@ -75,6 +89,7 @@ const AppContent = () => {
           <Route path="/todo"                 element={<ProtectedRoute><TodoPage /></ProtectedRoute>} />
           <Route path="/family"               element={<ProtectedRoute><FamilyLinkPage /></ProtectedRoute>} />
           <Route path="/family/messages"      element={<ProtectedRoute><FamilyMessagesPage /></ProtectedRoute>} />
+          <Route path="/profile-info"         element={<ProtectedRoute><ProfileInfoPage /></ProtectedRoute>} />
           <Route path="/notes"                element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
           <Route path="/notes/:id"            element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
           <Route path="/p/notes/:id"          element={<NotePublicPage />} />

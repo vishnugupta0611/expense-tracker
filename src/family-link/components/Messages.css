@@ -2,10 +2,13 @@
   width: 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
+  gap: 12px;
   margin: 16px 0;
 }
 
-.messages-fab {
+.messages-fab,
+.profile-fab {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19,10 +22,16 @@
   transition: all 0.2s ease;
 }
 
-.messages-fab:hover {
+.messages-fab:hover,
+.profile-fab:hover {
   background: #4338ca;
   box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
   transform: translateY(-2px);
+}
+
+.profile-fab {
+  background: #111827;
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .messages-icon {

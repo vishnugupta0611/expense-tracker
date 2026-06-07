@@ -18,7 +18,7 @@ const BottomNav = () => {
     { path: '/profile', icon: '👤', label: 'Profile' }
   ];
 
-  const isFamilyPage = location.pathname.startsWith('/family');
+  const isFamilyPage = location.pathname.startsWith('/family') || location.pathname === '/profile-info';
 
   return (
     <nav className={`bottom-nav ${isFamilyPage ? 'family-theme' : ''}`}>

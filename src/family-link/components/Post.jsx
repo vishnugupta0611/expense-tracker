@@ -1,392 +1,401 @@
+import { useState } from 'react';
+import { Heart, MessageCircle, Send, MoreVertical, Trash2 } from 'lucide-react';
+import api from '@services/api';
+import './Post.css';
 
+const defaultPosts = [
+  {
+    id: 1,
+    username: 'family_diary',
+    caption: 'Cousins reunion after ages',
+    location: 'Agra',
+    createdAt: '2026-05-15T07:00:00Z',
+    media: [
+      {
+        type: 'image',
+        url: 'https://images.pexels.com/photos/935985/pexels-photo-935985.jpeg',
+        frameType: 'portrait',
+      },
+    ],
+    likes: [{ userId: 'user_101' }, { userId: 'user_125' }],
+    comments: [
+      {
+        id: 'comment_13',
+        userId: 'user_213',
+        text: 'Everyone looks happy',
+        createdAt: '2026-05-15T09:00:00Z',
+      },
+    ],
+  },
+  {
+    id: 2,
+    username: 'night_vibes',
+    caption: 'Movie night setup complete',
+    location: 'Prayagraj',
+    createdAt: '2026-05-16T05:00:00Z',
+    media: [
+      {
+        type: 'image',
+        url: 'https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg',
+        frameType: 'square',
+      },
+    ],
+    likes: [{ userId: 'user_121' }, { userId: 'user_122' }, { userId: 'user_123' }],
+    comments: [
+      {
+        id: 'comment_11',
+        userId: 'user_211',
+        text: 'Bring snacks',
+        createdAt: '2026-05-16T08:20:00Z',
+      },
+    ],
+  },
+];
 
-import { useState } from "react";
+const fallbackUser = {
+  id: 'user_101',
+  name: 'Vishnu Gupta',
+  avatar: 'https://api.dicebear.com/9.x/lorelei/svg?seed=Vishnu',
+};
 
-export default function Post() {
-    const posts = [
+const getPostId = (post) => post._id || post.id;
 
-{
-id:1,
-image:"https://images.pexels.com/photos/37643742/pexels-photo-37643742.jpeg",
-likes:[
-{userId:"user_101"},
-{userId:"user_102"},
-{userId:"user_103"},
-{userId:"user_104"}
-],
-comments:[
-{
-id:"comment_1",
-userId:"user_201",
-text:"Wallpaper material 🔥",
-createdAt:"2026-05-22T10:30:00Z"
-},
-{
-id:"comment_2",
-userId:"user_202",
-text:"Insane shot 😮",
-createdAt:"2026-05-22T11:00:00Z"
-}
-],
-caption:"Late night city vibes 🌃",
-userId:"user_001",
-username:"vishnu_dev",
-location:"Varanasi",
-createdAt:"2026-05-22T08:00:00Z"
-},
+const getUserId = (value) => {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value._id || value.id || '';
+};
 
-{
-id:2,
-image:"https://images.pexels.com/photos/1108099/pexels-photo-1108099.jpeg",
-likes:[
-{userId:"user_105"},
-{userId:"user_106"}
-],
-comments:[
-{
-id:"comment_3",
-userId:"user_203",
-text:"Nature never misses 🍃",
-createdAt:"2026-05-22T12:00:00Z"
-}
-],
-caption:"Nature feels unreal sometimes 🍃",
-userId:"user_002",
-username:"ayush_raw",
-location:"Delhi",
-createdAt:"2026-05-21T07:00:00Z"
-},
+const getMedia = (post) => {
+  const frameType = post.frameType || post.frametype || 'square';
 
-{
-id:3,
-image:"https://images.pexels.com/photos/414612/pexels-photo-414612.jpeg",
-likes:[
-{userId:"user_107"},
-{userId:"user_108"},
-{userId:"user_109"}
-],
-comments:[
-{
-id:"comment_4",
-userId:"user_204",
-text:"Coding setup goals 💻",
-createdAt:"2026-05-21T09:00:00Z"
-},
-{
-id:"comment_5",
-userId:"user_205",
-text:"Coffee + code combo ☕",
-createdAt:"2026-05-21T09:30:00Z"
-}
-],
-caption:"Morning coffee and code ☕",
-userId:"user_003",
-username:"gupta_codes",
-location:"Kanpur",
-createdAt:"2026-05-21T06:00:00Z"
-},
+  if (Array.isArray(post.media) && post.media.length > 0) return post.media;
 
-{
-id:4,
-image:"https://images.pexels.com/photos/34950/pexels-photo.jpg",
-likes:[
-{userId:"user_110"}
-],
-comments:[
-{
-id:"comment_6",
-userId:"user_206",
-text:"Road trip needed asap 🚗",
-createdAt:"2026-05-20T08:00:00Z"
-}
-],
-caption:"Road trips hit different 🚗",
-userId:"user_004",
-username:"travel_x",
-location:"Mumbai",
-createdAt:"2026-05-20T06:00:00Z"
-},
-
-{
-id:5,
-image:"https://images.pexels.com/photos/1323550/pexels-photo-1323550.jpeg",
-likes:[
-{userId:"user_111"},
-{userId:"user_112"},
-{userId:"user_113"},
-{userId:"user_114"},
-{userId:"user_115"}
-],
-comments:[
-{
-id:"comment_7",
-userId:"user_207",
-text:"Need this place location 😭",
-createdAt:"2026-05-19T05:00:00Z"
-},
-{
-id:"comment_8",
-userId:"user_208",
-text:"Beautiful click ✨",
-createdAt:"2026-05-19T06:00:00Z"
-}
-],
-caption:"Sunsets quietly winning again 🌅",
-userId:"user_005",
-username:"sky_hunter",
-location:"Jaipur",
-createdAt:"2026-05-19T03:00:00Z"
-},
-
-{
-id:6,
-image:"https://images.pexels.com/photos/210186/pexels-photo-210186.jpeg",
-likes:[
-{userId:"user_116"},
-{userId:"user_117"}
-],
-comments:[
-{
-id:"comment_9",
-userId:"user_209",
-text:"That car looks sick 🏎️",
-createdAt:"2026-05-18T11:00:00Z"
-}
-],
-caption:"Weekend speed therapy 🏎️",
-userId:"user_006",
-username:"speed_king",
-location:"Noida",
-createdAt:"2026-05-18T08:00:00Z"
-},
-
-{
-id:7,
-image:"https://images.pexels.com/photos/257360/pexels-photo-257360.jpeg",
-likes:[
-{userId:"user_118"},
-{userId:"user_119"},
-{userId:"user_120"}
-],
-comments:[
-{
-id:"comment_10",
-userId:"user_210",
-text:"Doggo deserves verified badge 🐶",
-createdAt:"2026-05-17T12:00:00Z"
-}
-],
-caption:"CEO of cuteness 🐶",
-userId:"user_007",
-username:"pet_world",
-location:"Lucknow",
-createdAt:"2026-05-17T09:00:00Z"
-},
-
-{
-id:8,
-image:"https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg",
-likes:[
-{userId:"user_121"},
-{userId:"user_122"},
-{userId:"user_123"},
-{userId:"user_124"}
-],
-comments:[
-{
-id:"comment_11",
-userId:"user_211",
-text:"Movie night unlocked 🍿",
-createdAt:"2026-05-16T08:00:00Z"
-},
-{
-id:"comment_12",
-userId:"user_212",
-text:"Bring snacks 😭",
-createdAt:"2026-05-16T08:20:00Z"
-}
-],
-caption:"Movie night setup complete 🍿",
-userId:"user_008",
-username:"night_vibes",
-location:"Prayagraj",
-createdAt:"2026-05-16T05:00:00Z"
-},
-
-{
-id:9,
-image:"https://images.pexels.com/photos/935985/pexels-photo-935985.jpeg",
-likes:[
-{userId:"user_125"},
-{userId:"user_126"}
-],
-comments:[
-{
-id:"comment_13",
-userId:"user_213",
-text:"Everyone looks happy ❤️",
-createdAt:"2026-05-15T09:00:00Z"
-}
-],
-caption:"Cousins reunion after ages ❤️",
-userId:"user_009",
-username:"family_diary",
-location:"Agra",
-createdAt:"2026-05-15T07:00:00Z"
-},
-
-
-
-]
-  const [commentData, setCommentData] = useState({});
-  const [yourId] = useState("user_101");
-  const [postData, setPostData] = useState(posts);
-  const [activeCommentEdit, setActiveCommentEdit] = useState(null);
-
-   
-
-  function timeAgo(date) {
-    const diff = Math.floor((new Date() - new Date(date)) / 1000);
-    if (diff < 60) return `${diff}s ago`;
-    const mins = Math.floor(diff / 60);
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    const days = Math.floor(hrs / 24);
-    if (days < 7) return `${days}d ago`;
-    return `${Math.floor(days / 7)}w ago`;
+  if (Array.isArray(post.image) && post.image.length > 0) {
+    return post.image.map((url) => ({
+      type: url.includes('/video/upload/') || url.endsWith('.mp4') ? 'video' : 'image',
+      url,
+      frameType,
+    }));
   }
 
-  function toggleLike(postId) {
-    setPostData((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-        const liked = p.likes.some((like) => like.userId === yourId);
-        return {
-          ...p,
-          likes: liked
-            ? p.likes.filter((like) => like.userId !== yourId)
-            : [...p.likes, { userId: yourId }],
-        };
-      })
+  if (post.image && typeof post.image === 'string') {
+    return [{ type: 'image', url: post.image, frameType }];
+  }
+
+  return [];
+};
+
+const formatTime = (value) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const diff = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diff < 60) return 'Just now';
+
+  const mins = Math.floor(diff / 60);
+  if (mins < 60) return `${mins}m ago`;
+
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+
+  return `${Math.floor(days / 7)}w ago`;
+};
+
+const PostSkeleton = () => (
+  <article className="family-post-card family-post-skeleton" aria-hidden="true">
+    <div className="family-post-header">
+      <span className="skeleton-avatar" />
+      <div className="skeleton-lines">
+        <span />
+        <span />
+      </div>
+    </div>
+    <span className="skeleton-media" />
+    <div className="skeleton-actions">
+      <span />
+      <span />
+    </div>
+    <span className="skeleton-caption" />
+  </article>
+);
+
+const FamilyPostList = ({
+  posts,
+  onPostsChange,
+  onDeletePost,
+  currentUser = fallbackUser,
+  emptyMessage = 'No posts yet.',
+  isLoading = false,
+  isLoadingMore = false,
+  skeletonCount = 3,
+}) => {
+  const [localPosts, setLocalPosts] = useState(defaultPosts);
+  const [commentText, setCommentText] = useState({});
+  const [openComments, setOpenComments] = useState({});
+  const [activeSlides, setActiveSlides] = useState({});
+  const [pendingLikes, setPendingLikes] = useState({});
+  const [pendingComments, setPendingComments] = useState({});
+  const [openMenus, setOpenMenus] = useState({});
+
+  const postItems = posts || localPosts;
+  const updatePosts = onPostsChange || setLocalPosts;
+  const user = {
+    id: currentUser._id || currentUser.id || fallbackUser.id,
+    name: currentUser.name || fallbackUser.name,
+    avatar: currentUser.avatar || fallbackUser.avatar,
+  };
+
+  const updatePost = (postId, updater) => {
+    updatePosts((prev) => prev.map((post) => (getPostId(post) === postId ? updater(post) : post)));
+  };
+
+  const toggleLike = async (post) => {
+    const postId = getPostId(post);
+    if (!postId || pendingLikes[postId]) return;
+
+    const likes = post.likes || [];
+    const liked = likes.some((like) => getUserId(like.userId) === user.id);
+
+    updatePost(postId, (item) => ({
+      ...item,
+      likes: liked
+        ? (item.likes || []).filter((like) => getUserId(like.userId) !== user.id)
+        : [...(item.likes || []), { userId: user.id }],
+    }));
+
+    if (!post._id) return;
+
+    setPendingLikes((prev) => ({ ...prev, [postId]: true }));
+
+    try {
+      const response = await api.patch(`/family-posts/${postId}/fluctuate-like`);
+      updatePost(postId, (item) => ({
+        ...item,
+        likes: response.data.likes || item.likes,
+      }));
+    } catch (error) {
+      updatePost(postId, (item) => ({ ...item, likes }));
+      console.error('Failed to update like:', error.response?.data?.error || error.message);
+    } finally {
+      setPendingLikes((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const addComment = async (post) => {
+    const postId = getPostId(post);
+    const text = commentText[postId]?.trim();
+    if (!postId || !text || pendingComments[postId]) return;
+
+    if (!post._id) {
+      updatePost(postId, (item) => ({
+        ...item,
+        comments: [
+          ...(item.comments || []),
+          {
+            id: `comment-${Date.now()}`,
+            userId: user.id,
+            text,
+            createdAt: new Date().toISOString(),
+          },
+        ],
+      }));
+      setCommentText((prev) => ({ ...prev, [postId]: '' }));
+      return;
+    }
+
+    setPendingComments((prev) => ({ ...prev, [postId]: true }));
+
+    try {
+      const response = await api.post(`/family-posts/${postId}/comments`, { text });
+      updatePost(postId, (item) => ({
+        ...item,
+        comments: response.data.comments || item.comments,
+      }));
+      setCommentText((prev) => ({ ...prev, [postId]: '' }));
+    } catch (error) {
+      console.error('Failed to add comment:', error.response?.data?.error || error.message);
+    } finally {
+      setPendingComments((prev) => ({ ...prev, [postId]: false }));
+    }
+  };
+
+  const moveSlide = (postId, mediaCount, direction) => {
+    setActiveSlides((prev) => {
+      const current = prev[postId] || 0;
+      return {
+        ...prev,
+        [postId]: (current + direction + mediaCount) % mediaCount,
+      };
+    });
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!onDeletePost) return;
+    setOpenMenus((prev) => ({ ...prev, [postId]: false }));
+    await onDeletePost(postId);
+  };
+
+  if (isLoading && postItems.length === 0) {
+    return (
+      <div className="family-post-list">
+        {Array.from({ length: skeletonCount }, (_, index) => <PostSkeleton key={index} />)}
+      </div>
     );
   }
 
-  function addComment(postId) {
-    if (!commentData[postId]) return;
-    setPostData((prev) =>
-      prev.map((p) => {
-        if (p.id !== postId) return p;
-        return {
-          ...p,
-          comments: [
-            ...p.comments,
-            {
-              id: Date.now(),
-              userId: yourId,
-              text: commentData[postId],
-              createdAt: new Date(),
-            },
-          ],
-        };
-      })
-    );
-    setCommentData((prev) => ({ ...prev, [postId]: "" }));
+  if (postItems.length === 0) {
+    return <p className="family-post-empty">{emptyMessage}</p>;
   }
 
   return (
-    <div className="bg-black text-white w-full flex flex-col items-center px-1 py-4">
-      {postData.map((post) => (
-        <div key={post.id} className="w-full max-w-[500px] mb-10">
+    <div className="family-post-list">
+      {postItems.map((post) => {
+        const postId = getPostId(post);
+        const media = getMedia(post);
+        const imageMedia = media.filter((item) => item.type !== 'video');
+        const videoMedia = media.find((item) => item.type === 'video');
+        const activeIndex = activeSlides[postId] || 0;
+        const activeImage = imageMedia[activeIndex] || imageMedia[0];
+        const activeMedia = videoMedia || activeImage || media[0];
+        const frameClass = activeMedia?.frameType || 'square';
+        const likes = post.likes || [];
+        const comments = post.comments || [];
+        const isLiked = likes.some((like) => getUserId(like.userId) === user.id);
+        const authorName = post.username || post.authorName || post.userId?.name || user.name;
+        const authorAvatar =
+          post.avatar || post.authorAvatar || post.userId?.avatar || `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(authorName)}`;
 
-          {/* Profile */}
-          <div className="flex items-center gap-3 mb-3">
-            <img
-              height={40}
-              width={40}
-              loading="eager"
-              className="rounded-full"
-              src={`https://api.dicebear.com/9.x/lorelei/svg?seed=${post.username}`}
-              alt=""
-            />
-            <div>
-              <h3 className="text-sm">{post.username}</h3>
-              <p className="text-xs text-gray-500">{timeAgo(post.createdAt)}</p>
-            </div>
-          </div>
-
-          {/* Image */}
-          <img
-            src={post.image}
-            alt=""
-            loading="eager"
-            fetchPriority="high"
-            width={600}
-            height={500}
-            className="w-full h-[450px] rounded-[25px] object-cover"
-          />
-
-          {/* Actions */}
-          <div className="flex gap-5 text-2xl py-4">
-            <div className="cursor-pointer" onClick={() => toggleLike(post.id)}>
-              {post.likes.some((like) => like.userId === yourId) ? "❤️" : "🤍"}
-            </div>
-            <div
-              className="cursor-pointer"
-              onClick={() =>
-                setActiveCommentEdit((prev) =>
-                  prev === post.id ? null : post.id
-                )
-              }
-            >
-              💬
-            </div>
-          </div>
-
-          {/* Likes */}
-          <div className="text-sm font-bold">{post.likes.length} likes</div>
-
-          {/* Caption */}
-          <div className="text-sm mt-2">
-            <b>{post.username}</b> {post.caption}
-          </div>
-
-          {/* Comments */}
-          {activeCommentEdit === post.id && (
-            <div className="mt-4">
-              <div className="flex gap-2">
-                <input
-                  value={commentData[post.id] || ""}
-                  onChange={(e) =>
-                    setCommentData((prev) => ({
-                      ...prev,
-                      [post.id]: e.target.value,
-                    }))
-                  }
-                  placeholder="Add comment..."
-                  className="flex-1 bg-[#111] border-none outline-none rounded-full px-4 h-[40px] text-sm"
-                />
-                <button
-                  onClick={() => addComment(post.id)}
-                  className="bg-[#222] px-4 rounded-full text-sm"
-                >
-                  Add
-                </button>
+        return (
+          <article key={postId} className="family-post-card">
+            <div className="family-post-header">
+              <img src={authorAvatar} alt={authorName} className="family-post-avatar" />
+              <div>
+                <h3>{authorName}</h3>
+                <p>{post.location ? `${post.location} - ` : ''}{formatTime(post.createdAt)}</p>
               </div>
+              {onDeletePost && getUserId(post.userId) === user.id && (
+                <div className="family-post-menu">
+                  <button
+                    type="button"
+                    className="family-post-menu-btn"
+                    aria-label="Post menu"
+                    onClick={() => setOpenMenus((prev) => ({ ...prev, [postId]: !prev[postId] }))}
+                  >
+                    <MoreVertical size={20} />
+                  </button>
+                  {openMenus[postId] && (
+                    <div className="family-post-dropdown">
+                      <button
+                        type="button"
+                        className="family-post-delete-btn"
+                        onClick={() => handleDeletePost(postId)}
+                      >
+                        <Trash2 size={16} />
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
-              <div className="mt-4">
-                {post.comments.map((comment) => (
-                  <div key={comment.id} className="flex gap-2 mb-3 text-sm">
-                    <b>{comment.userId}</b>
-                    <span className="text-gray-300">{comment.text}</span>
+            {media.length > 0 && (
+              videoMedia ? (
+                <video className={`family-post-media ${frameClass}`} controls src={videoMedia.url} />
+              ) : (
+                activeImage && (
+                  <div className="family-post-slider">
+                    <img className={`family-post-media ${frameClass}`} src={activeImage.url} alt={post.caption || post.text || 'Family post'} />
+                    {imageMedia.length > 1 && (
+                      <>
+                        <button type="button" className="family-slider-btn left" onClick={() => moveSlide(postId, imageMedia.length, -1)}>
+                          Prev
+                        </button>
+                        <button type="button" className="family-slider-btn right" onClick={() => moveSlide(postId, imageMedia.length, 1)}>
+                          Next
+                        </button>
+                      </>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
+                )
+              )
+            )}
 
-        </div>
-      ))}
+            <div className="family-post-actions">
+              <button
+                type="button"
+                className={isLiked ? 'liked' : ''}
+                aria-label={isLiked ? 'Unlike post' : 'Like post'}
+                disabled={Boolean(pendingLikes[postId])}
+                onClick={() => toggleLike(post)}
+              >
+                <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
+              </button>
+              <button
+                type="button"
+                aria-label="Comment on post"
+                onClick={() => setOpenComments((prev) => ({ ...prev, [postId]: !prev[postId] }))}
+              >
+                <MessageCircle size={22} />
+              </button>
+            </div>
+
+            <p className="family-post-counts">
+              <strong>{likes.length}</strong> likes
+              {comments.length > 0 && <span> - {comments.length} comments</span>}
+            </p>
+
+            {(post.caption || post.text) && (
+              <p className="family-post-caption">
+                <strong>{authorName}</strong> {post.caption || post.text}
+              </p>
+            )}
+
+            {openComments[postId] && (
+              <div className="family-comments">
+                <div className="family-comment-input-row">
+                  <input
+                    value={commentText[postId] || ''}
+                    onChange={(event) =>
+                      setCommentText((prev) => ({ ...prev, [postId]: event.target.value }))
+                    }
+                    placeholder="Add comment..."
+                  />
+                  <button
+                    type="button"
+                    aria-label="Send comment"
+                    disabled={Boolean(pendingComments[postId])}
+                    onClick={() => addComment(post)}
+                  >
+                    <Send size={17} />
+                  </button>
+                </div>
+
+                {comments.length > 0 && (
+                  <div className="family-comment-list">
+                    {comments.map((comment) => {
+                      const commentUser = comment.userId?.name || comment.userId || 'Family member';
+                      return (
+                        <p key={comment.commentId || comment._id || comment.id} className="family-comment">
+                          <strong>{commentUser}</strong> {comment.text}
+                        </p>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+          </article>
+        );
+      })}
+
+      {isLoadingMore && Array.from({ length: 2 }, (_, index) => <PostSkeleton key={`more-${index}`} />)}
     </div>
   );
-}
+};
+
+export default FamilyPostList;
