@@ -3,6 +3,7 @@
   padding-bottom: 100px; /* More space for bottom nav */
   max-width: 1400px; /* Wider for better space usage */
   margin: 0 auto;
+  color: var(--text-primary);
 }
 
 .expenses-header {
@@ -16,7 +17,6 @@
   height: 100px;
   width: auto;
   object-fit: contain;
-  mix-blend-mode: multiply;
   background: transparent;
 }
 
@@ -115,7 +115,7 @@
 }
 
 .quick-stats {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-sm);
@@ -153,7 +153,7 @@
 }
 
 .expenses-timeline {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-sm);
@@ -224,7 +224,7 @@
 }
 
 .expense-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-secondary);
 }
 
 .expense-icon {
@@ -487,7 +487,7 @@
 }/* Spa
 ce Sharing */
 .space-sharing {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
   box-shadow: var(--shadow-sm);
@@ -552,7 +552,7 @@ ce Sharing */
   padding: 0.5rem 1rem;
   border: 1px solid var(--error);
   border-radius: var(--radius-md);
-  background: white;
+  background: var(--card-bg);
   color: var(--error);
   font-size: 0.875rem;
   font-weight: 600;
@@ -581,7 +581,7 @@ ce Sharing */
 }
 
 .dialog {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius-xl);
   padding: 2rem;
   max-width: 400px;
@@ -1052,7 +1052,7 @@ iple Spaces Support */
 }
 
 .expense-item:hover {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--bg-secondary);
 }
 
 .expense-icon {
@@ -1397,4 +1397,94 @@ iple Spaces Support */
   .expenses-tabs {
     margin-bottom: 1rem;
   }
+}
+
+/* Professional dark theme tuning */
+body.dark .expenses-page {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(99, 102, 241, 0.12), transparent 30%),
+    radial-gradient(circle at 92% 8%, rgba(16, 185, 129, 0.08), transparent 26%);
+}
+
+body.dark .summary-card,
+body.dark .quick-stats,
+body.dark .expenses-timeline,
+body.dark .expense-group,
+body.dark .space-sharing,
+body.dark .filters-panel,
+body.dark .category-breakdown,
+body.dark .space-tab-card {
+  background: linear-gradient(180deg, rgba(21, 31, 46, 0.98), rgba(15, 23, 42, 0.98));
+  border-color: rgba(148, 163, 184, 0.14);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.22);
+}
+
+body.dark .expenses-timeline,
+body.dark .expense-group {
+  border-color: rgba(148, 163, 184, 0.16);
+}
+
+body.dark .expense-date-header {
+  background: rgba(15, 23, 42, 0.72);
+  border-bottom-color: rgba(148, 163, 184, 0.12);
+}
+
+body.dark .expense-item {
+  border-bottom-color: rgba(148, 163, 184, 0.1);
+}
+
+body.dark .expense-item:hover {
+  background: rgba(139, 147, 255, 0.08);
+}
+
+body.dark .expense-icon {
+  background: rgba(139, 147, 255, 0.15);
+  color: #dbeafe;
+  border: 1px solid rgba(139, 147, 255, 0.18);
+}
+
+body.dark .expenses-tabs {
+  background: rgba(15, 23, 42, 0.86);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+body.dark .tab-btn {
+  color: var(--text-secondary);
+}
+
+body.dark .tab-btn.active {
+  background: rgba(139, 147, 255, 0.16);
+  color: #eef2ff;
+  box-shadow: inset 0 0 0 1px rgba(139, 147, 255, 0.18);
+}
+
+body.dark .space-name-header,
+body.dark .category-stat,
+body.dark .dialog-date-range {
+  background: rgba(139, 147, 255, 0.1);
+  border-color: rgba(139, 147, 255, 0.2);
+}
+
+body.dark .sharing-alert.positive,
+body.dark .sharing-alert.settled,
+body.dark .space-tab-status.owed,
+body.dark .space-tab-status.settled {
+  background: rgba(52, 211, 153, 0.1);
+  border-color: rgba(52, 211, 153, 0.22);
+}
+
+body.dark .sharing-alert.negative,
+body.dark .space-tab-status.owing {
+  background: rgba(251, 113, 133, 0.1);
+  border-color: rgba(251, 113, 133, 0.22);
+}
+
+body.dark .delete-btn:hover {
+  background: rgba(251, 113, 133, 0.12);
+}
+
+body.dark .skeleton-header,
+body.dark .skeleton-card {
+  background: linear-gradient(90deg, #111827 25%, #1f2937 37%, #111827 63%);
+  background-size: 400% 100%;
 }

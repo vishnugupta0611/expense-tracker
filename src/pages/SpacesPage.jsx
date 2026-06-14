@@ -1,6 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '@services/api';
+import PageLoader from '@components/PageLoader';
+import VoiceExpenseBtn from '@components/expenses/VoiceExpenseBtn';
+import SuccessNotification from '@components/shared/SuccessNotification';
+import '@components/expenses/QuickAddInput.css';
 import './SpacesPage.css';
 
 const SpacesPage = () => {
@@ -12,16 +16,64 @@ const SpacesPage = () => {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showQuickAddModal, setShowQuickAddModal] = useState(false);
   const [selectedSpace, setSelectedSpace] = useState(null);
+  const [deletingSpaceId, setDeletingSpaceId] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    memberEmails: '',
     monthly: 0
   });
+  const [selectedEmails, setSelectedEmails] = useState([]);   // chips for member emails
+  const [memberQuery, setMemberQuery] = useState('');
+  const [memberSuggestions, setMemberSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionTimer = useRef(null);
   const [quickAddData, setQuickAddData] = useState({
     amount: '',
     description: '',
     category: 'Other'
   });
+
+  // Global Quick Add State
+  const [showGlobalQuickAddModal, setShowGlobalQuickAddModal] = useState(false);
+  const [globalQuickAddLoading, setGlobalQuickAddLoading] = useState(false);
+  const [globalQuickAddData, setGlobalQuickAddData] = useState({
+    amount: '',
+    description: '',
+    spaceId: '',
+    category: 'Other'
+  });
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
+
+  // Debounced user search
+  const handleMemberQueryChange = (val) => {
+    setMemberQuery(val);
+    clearTimeout(suggestionTimer.current);
+    if (!val.trim()) { setMemberSuggestions([]); setShowSuggestions(false); return; }
+    suggestionTimer.current = setTimeout(async () => {
+      try {
+        const res = await api.get(`/users/search?query=${encodeURIComponent(val)}`);
+        setMemberSuggestions(res.data.usernames || []);
+        setShowSuggestions(true);
+      } catch { setMemberSuggestions([]); }
+    }, 300);
+  };
+
+  const selectSuggestion = (suggestion) => {
+    if (!selectedEmails.includes(suggestion.email)) {
+      setSelectedEmails(prev => [...prev, suggestion.email]);
+    }
+    setMemberQuery('');
+    setMemberSuggestions([]);
+    setShowSuggestions(false);
+  };
+
+  const removeEmail = (email) => setSelectedEmails(prev => prev.filter(e => e !== email));
+
+  const resetMemberState = () => {
+    setSelectedEmails([]);
+    setMemberQuery('');
+    setMemberSuggestions([]);
+    setShowSuggestions(false);
+  };
 
   const fetchSpaces = async () => {
     try {
@@ -99,23 +151,19 @@ const SpacesPage = () => {
 
   useEffect(() => {
     fetchSpaces();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleCreateSpace = async (e) => {
     e.preventDefault();
     try {
-      const emails = formData.memberEmails.split(',')
-        .map(u => u.trim().toLowerCase().replace(/\s+/g, '_'))
-        .filter(u => u)
-        .map(u => u.includes('@') ? u : `${u}@spendly.app`);
       await api.post('/spaces', {
         name: formData.name,
-        memberEmails: emails,
+        memberEmails: selectedEmails,
         budgets: { monthly: Number(formData.monthly) }
       });
       setShowCreateModal(false);
-      setFormData({ name: '', memberEmails: '', monthly: 0 });
+      setFormData({ name: '', monthly: 0 });
+      resetMemberState();
       fetchSpaces();
     } catch (error) {
       console.error('Failed to create space:', error);
@@ -138,14 +186,10 @@ const SpacesPage = () => {
   const handleAddMembers = async (e) => {
     e.preventDefault();
     try {
-      const emails = formData.memberEmails.split(',')
-        .map(u => u.trim().toLowerCase().replace(/\s+/g, '_'))
-        .filter(u => u)
-        .map(u => u.includes('@') ? u : `${u}@spendly.app`);
-      await api.post(`/spaces/${selectedSpace._id}/members`, { emails });
+      await api.post(`/spaces/${selectedSpace._id}/members`, { emails: selectedEmails });
       setShowAddMemberModal(false);
       setSelectedSpace(null);
-      setFormData({ ...formData, memberEmails: '' });
+      resetMemberState();
       fetchSpaces();
     } catch (error) {
       console.error('Failed to add members:', error);
@@ -177,10 +221,98 @@ const SpacesPage = () => {
     }
   };
 
+  const openGlobalQuickAdd = () => {
+    if (spaces.length === 0) {
+      alert("Please create a space first!");
+      return;
+    }
+    const savedSpaceId = localStorage.getItem('last_selected_space_id');
+    const isValidSaved = spaces.some(s => s._id === savedSpaceId);
+    const defaultSpaceId = isValidSaved ? savedSpaceId : (spaces[0]?._id || '');
+
+    setGlobalQuickAddData({
+      amount: '',
+      description: '',
+      spaceId: defaultSpaceId,
+      category: 'Other'
+    });
+    setShowGlobalQuickAddModal(true);
+  };
+
+  const handleSpaceChange = (e) => {
+    const val = e.target.value;
+    setGlobalQuickAddData(prev => ({ ...prev, spaceId: val }));
+    localStorage.setItem('last_selected_space_id', val);
+  };
+
+  const handleGlobalQuickAddSubmit = async (e) => {
+    e.preventDefault();
+    if (!globalQuickAddData.amount || parseFloat(globalQuickAddData.amount) <= 0 || !globalQuickAddData.spaceId) return;
+
+    try {
+      setGlobalQuickAddLoading(true);
+      await api.post(`/spaces/${globalQuickAddData.spaceId}/expenses`, {
+        amount: parseFloat(globalQuickAddData.amount),
+        description: globalQuickAddData.description,
+        category: globalQuickAddData.category || 'Other'
+      });
+      setShowGlobalQuickAddModal(false);
+      setGlobalQuickAddData(prev => ({
+        ...prev,
+        amount: '',
+        description: '',
+        category: 'Other'
+      }));
+      setShowSuccessNotification(true);
+      fetchSpaces();
+    } catch (error) {
+      console.error('Failed to add space expense:', error);
+      alert(error.response?.data?.error || 'Failed to add space expense');
+    } finally {
+      setGlobalQuickAddLoading(false);
+    }
+  };
+
+  const handleGlobalVoiceExpense = (expense) => {
+    setShowSuccessNotification(true);
+    setShowGlobalQuickAddModal(false);
+    setGlobalQuickAddData(prev => ({
+      ...prev,
+      amount: '',
+      description: '',
+      category: 'Other'
+    }));
+    fetchSpaces();
+  };
+
+  const handleDeleteSpace = async (space, e) => {
+    e.stopPropagation();
+
+    const confirmed = window.confirm(
+      `Delete "${space.name}"? This will permanently delete this space and all related expenses.`
+    );
+
+    if (!confirmed || deletingSpaceId) return;
+
+    const previousSpaces = spaces;
+    setDeletingSpaceId(space._id);
+    setSpaces((prev) => prev.filter((item) => item._id !== space._id));
+
+    try {
+      await api.delete(`/spaces/${space._id}`);
+    } catch (error) {
+      console.error('Failed to delete space:', error);
+      setSpaces(previousSpaces);
+      alert(error.response?.data?.error || 'Failed to delete space');
+    } finally {
+      setDeletingSpaceId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="spaces-page">
-        <div className="loading-spinner">Loading...</div>
+        <PageLoader />
       </div>
     );
   }
@@ -225,11 +357,16 @@ const SpacesPage = () => {
                 <div className="card-body">
                   <div className="card-top-row">
                     <h3 className="card-title">{space.name}</h3>
-                    <button 
-                      className="quick-add-btn" 
-                      onClick={(e) => openQuickAddModal(space, e)}
-                      title="Quick Add Expense"
-                    >+</button>
+                    <div className="space-card-actions">
+                      <button
+                        className="space-delete-btn"
+                        onClick={(e) => handleDeleteSpace(space, e)}
+                        title="Delete space"
+                        disabled={deletingSpaceId === space._id}
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
 
                   <div className="card-stats">
@@ -289,7 +426,7 @@ const SpacesPage = () => {
 
       {/* Create Modal */}
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowCreateModal(false); resetMemberState(); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Create New Space</h2>
             <form onSubmit={handleCreateSpace}>
@@ -304,14 +441,40 @@ const SpacesPage = () => {
                 />
               </div>
               <div className="form-group">
-                <label>Add Members (Usernames)</label>
-                <textarea
-                  value={formData.memberEmails}
-                  onChange={(e) => setFormData({ ...formData, memberEmails: e.target.value })}
-                  placeholder="username1, username2"
-                  rows={3}
-                />
-                <small>Comma-separated. Only registered users can be added.</small>
+                <label>Add Members</label>
+                <div className="member-search-wrap">
+                  {selectedEmails.length > 0 && (
+                    <div className="member-chips">
+                      {selectedEmails.map(email => (
+                        <span key={email} className="member-chip">
+                          {email}
+                          <button type="button" onClick={() => removeEmail(email)}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={memberQuery}
+                      onChange={e => handleMemberQueryChange(e.target.value)}
+                      onFocus={() => memberQuery.trim() && setShowSuggestions(true)}
+                      placeholder="Search by name..."
+                      autoComplete="off"
+                    />
+                    {showSuggestions && memberSuggestions.length > 0 && (
+                      <div className="member-suggestions">
+                        {memberSuggestions.map((s, i) => (
+                          <div key={i} className="member-suggestion-item" onMouseDown={() => selectSuggestion(s)}>
+                            <span className="suggestion-name">{s.name}</span>
+                            <span className="suggestion-email">{s.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <small>Search and select registered users to add.</small>
               </div>
               <div className="form-group">
                 <label>Monthly Budget (Optional)</label>
@@ -368,19 +531,44 @@ const SpacesPage = () => {
 
       {/* Add Member Modal */}
       {showAddMemberModal && selectedSpace && (
-        <div className="modal-overlay" onClick={() => setShowAddMemberModal(false)}>
+        <div className="modal-overlay" onClick={() => { setShowAddMemberModal(false); resetMemberState(); }}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h2>Add Members to {selectedSpace.name}</h2>
             <form onSubmit={handleAddMembers}>
               <div className="form-group">
-                <label>Member Usernames</label>
-                <textarea
-                  value={formData.memberEmails}
-                  onChange={(e) => setFormData({ ...formData, memberEmails: e.target.value })}
-                  placeholder="username1, username2"
-                  rows={3}
-                  required
-                />
+                <label>Search Members</label>
+                <div className="member-search-wrap">
+                  {selectedEmails.length > 0 && (
+                    <div className="member-chips">
+                      {selectedEmails.map(email => (
+                        <span key={email} className="member-chip">
+                          {email}
+                          <button type="button" onClick={() => removeEmail(email)}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      value={memberQuery}
+                      onChange={e => handleMemberQueryChange(e.target.value)}
+                      onFocus={() => memberQuery.trim() && setShowSuggestions(true)}
+                      placeholder="Search by name..."
+                      autoComplete="off"
+                    />
+                    {showSuggestions && memberSuggestions.length > 0 && (
+                      <div className="member-suggestions">
+                        {memberSuggestions.map((s, i) => (
+                          <div key={i} className="member-suggestion-item" onMouseDown={() => selectSuggestion(s)}>
+                            <span className="suggestion-name">{s.name}</span>
+                            <span className="suggestion-email">{s.email}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <small>Only registered users can be added</small>
               </div>
               <div className="modal-actions">
@@ -451,6 +639,112 @@ const SpacesPage = () => {
           </div>
         </div>
       )}
+
+      {/* Global Floating Plus Button */}
+      <button
+        className="floating-add-btn"
+        onClick={openGlobalQuickAdd}
+        title="Quick Add Space Expense"
+        style={{ bottom: '90px', right: '18px' }}
+      >
+        +
+      </button>
+
+      {/* Global Quick Add Modal */}
+      {showGlobalQuickAddModal && (
+        <div className="floating-overlay" onClick={() => setShowGlobalQuickAddModal(false)}>
+          <div className="floating-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="floating-modal-header">
+              <span>Add Space Expense</span>
+              <button type="button" className="modal-close-btn" onClick={() => setShowGlobalQuickAddModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleGlobalQuickAddSubmit}>
+              {/* Space Selection Dropdown */}
+              <div className="form-group" style={{ marginBottom: '0.875rem' }}>
+                <label style={{ fontSize: '0.8rem', marginBottom: '0.3rem' }}>Select Space</label>
+                <select
+                  value={globalQuickAddData.spaceId}
+                  onChange={handleSpaceChange}
+                  style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+                  required
+                >
+                  {spaces.map(s => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount Row */}
+              <div className="modal-amount-row">
+                <span className="modal-currency">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="modal-amount-input"
+                  placeholder="0"
+                  value={globalQuickAddData.amount}
+                  onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, amount: e.target.value }))}
+                  disabled={globalQuickAddLoading}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Description Input + Mic Row */}
+              <div className="modal-note-wrap">
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="modal-note-input"
+                    placeholder="Note / Description"
+                    value={globalQuickAddData.description}
+                    onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, description: e.target.value }))}
+                    disabled={globalQuickAddLoading}
+                    style={{ flex: 1, margin: 0 }}
+                  />
+                  <VoiceExpenseBtn 
+                    inline 
+                    spaceId={globalQuickAddData.spaceId} 
+                    onExpenseAdded={handleGlobalVoiceExpense} 
+                  />
+                </div>
+              </div>
+
+              {/* Category Dropdown */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.8rem', marginBottom: '0.3rem' }}>Category</label>
+                <select
+                  value={globalQuickAddData.category}
+                  onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, category: e.target.value }))}
+                  style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+                >
+                  <option value="Food">🍕 Food</option>
+                  <option value="Transport">🚗 Transport</option>
+                  <option value="Bills">💡 Bills</option>
+                  <option value="Grocery">🛒 Grocery</option>
+                  <option value="Entertainment">🎬 Entertainment</option>
+                  <option value="Other">📦 Other</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="modal-submit-btn"
+                disabled={globalQuickAddLoading || !globalQuickAddData.amount || parseFloat(globalQuickAddData.amount) <= 0}
+              >
+                {globalQuickAddLoading ? 'Adding...' : `Add ₹${globalQuickAddData.amount || '0'} to Space`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Success Notification */}
+      <SuccessNotification
+        message="Space expense added!"
+        isVisible={showSuccessNotification}
+        onClose={() => setShowSuccessNotification(false)}
+      />
     </div>
   );
 };

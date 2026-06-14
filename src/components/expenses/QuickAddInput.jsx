@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import api from '@services/api.js';
 import SuccessNotification from '@components/shared/SuccessNotification';
+import VoiceExpenseBtn from './VoiceExpenseBtn';
 import './QuickAddInput.css';
 
 const CATEGORY_EMOJI = {
@@ -61,6 +62,14 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleVoiceExpense = (expense) => {
+    // Voice expense is already saved by backend — just add to UI and close
+    onExpenseAdded(expense);
+    setShowSuccess(true);
+    setShowFloatingForm(false);
+    setTimeout(() => setShowSuccess(false), 900);
   };
 
   const handleSubmit = (e) => { e.preventDefault(); submit(); };
@@ -141,6 +150,12 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
               >
                 {loading ? 'Adding...' : `Add  ₹${amount || '0'} · ${getCategory()}`}
               </button>
+
+              <div className="modal-divider">
+                <span>or</span>
+              </div>
+
+              <VoiceExpenseBtn onExpenseAdded={handleVoiceExpense} />
             </form>
           </div>
         </div>
@@ -162,27 +177,31 @@ const QuickAddInput = ({ categories, onExpenseAdded }) => {
                 disabled={loading}
               />
             </div>
-            <div className="note-wrap">
-              <input
-                type="text"
-                className="quick-note-input"
-                placeholder="Note (acts as custom tag)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                disabled={loading}
-              />
-              {note.trim() && (
-                <span className="inline-note-tag">🏷️ {note.trim()}</span>
-              )}
-            </div>
+            <input
+              type="text"
+              className="quick-note-input"
+              placeholder="Note / tag"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              disabled={loading}
+            />
             <button
               type="submit"
               className="quick-add-btn"
               disabled={loading || !amount || parseFloat(amount) <= 0}
+              title="Add expense"
             >
               {loading ? '…' : '+'}
             </button>
+            <VoiceExpenseBtn onExpenseAdded={handleVoiceExpense} inline />
           </div>
+
+          {/* Tag preview — below the row, no overlap */}
+          {note.trim() && (
+            <div className="inline-note-tag-row">
+              <span className="inline-note-tag">🏷️ {note.trim()}</span>
+            </div>
+          )}
 
           {/* Only show chips when note is empty */}
           {!note.trim() && <ChipRow />}

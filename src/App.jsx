@@ -2,6 +2,7 @@ import { lazy, Suspense, useState, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@context/AuthContext';
 import { TodoProvider } from '@context/TodoContext';
+import { ThemeProvider } from '@context/ThemeContext';
 import BottomNav from '@components/navigation/BottomNav';
 import InstallPrompt from './components/InstallPrompt';
 import SplashScreen from './components/SplashScreen';
@@ -27,6 +28,7 @@ const NotePublicPage     = lazy(() => import('./pages/NotePublicPage'));
 const DrivePage          = lazy(() => import('./pages/DrivePage'));
 const WordLibraryPage    = lazy(() => import('./pages/WordLibraryPage'));
 const WalletPage         = lazy(() => import('./pages/WalletPage'));
+const JobsPage           = lazy(() => import('./pages/JobsPage'));
 const FamilyLinkPage     = lazy(() => import('./pages/FamilyLinkPage'));
 const FamilyMessagesPage = lazy(() => import('./pages/FamilyMessagesPage'));
 const ProfileInfoPage    = lazy(() => import('./pages/ProfileInfoPage'));
@@ -79,6 +81,7 @@ getNotificationToken();
           <Route path="/auth"                 element={<AuthPage />} />
           <Route path="/expenses"             element={<ProtectedRoute><ExpensesPage /></ProtectedRoute>} />
           <Route path="/spaces"               element={<ProtectedRoute><SpacesPage /></ProtectedRoute>} />
+          <Route path="/jobs"                 element={<ProtectedRoute><JobsPage /></ProtectedRoute>} />
           <Route path="/spaces/:id"           element={<ProtectedRoute><SpaceDetailsPage /></ProtectedRoute>} />
           <Route path="/spaces/:id/analytics" element={<ProtectedRoute><SpaceAnalyticsPage /></ProtectedRoute>} />
           <Route path="/profile"              element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
@@ -111,12 +114,14 @@ function App() {
 
   return (
     <Router>
+      <ThemeProvider>
       <AuthProvider>
         <TodoProvider>
           {!splashDone && <SplashScreen onDone={handleSplashDone} />}
           {splashDone && <AppContent />}
         </TodoProvider>
       </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

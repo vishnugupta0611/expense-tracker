@@ -16,8 +16,9 @@ const frameOptions = [
 
 
 const ProfileInfoPage = () => {
-  const { user } = useAuth();
+  const { user, login } = useAuth();
   const fileInputRef = useRef(null);
+  const avatarInputRef = useRef(null);
 
   const [posts, setPosts] = useState([]);
   const [members, setMembers] = useState([]);
@@ -32,11 +33,40 @@ const ProfileInfoPage = () => {
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || '');
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+
+  // Keep local avatar in sync with user context
+  useEffect(() => {
+    if (user?.avatar) setAvatarUrl(user.avatar);
+  }, [user?.avatar]);
 
   const displayName = user?.name || 'Vishnu Gupta';
-  const avatar = user?.avatar || 'https://api.dicebear.com/9.x/lorelei/svg?seed=Vishnu';
+  const avatar = avatarUrl || user?.avatar || `https://api.dicebear.com/9.x/lorelei/svg?seed=${encodeURIComponent(user?.name || 'user')}`;
 
   const openPicker = () => fileInputRef.current?.click();
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingAvatar(true);
+    try {
+      const formData = new FormData();
+      formData.append('avatar', file);
+      const res = await api.post('/users/upload-avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setAvatarUrl(res.data.avatar);
+      // Update user in AuthContext so the new avatar persists across pages and refreshes
+      const token = localStorage.getItem('token');
+      login(token, res.data.user);
+    } catch (err) {
+      alert('Failed to upload avatar: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = '';
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +241,19 @@ const ProfileInfoPage = () => {
         </div>
 
         <section className="profile-card">
-          <img src={avatar} alt={displayName} className="profile-avatar" />
+          <div className="profile-avatar-wrap" onClick={() => avatarInputRef.current?.click()} title="Change profile photo">
+            <img src={avatar} alt={displayName} className="profile-avatar" />
+            <div className="avatar-upload-badge">
+              {isUploadingAvatar ? '⏳' : '📷'}
+            </div>
+          </div>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleAvatarUpload}
+          />
           <h1 className="profile-name">{displayName}</h1>
           <p className="profile-bio">Family Admin - Family Media</p>
 

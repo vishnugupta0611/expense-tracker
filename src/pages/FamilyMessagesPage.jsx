@@ -77,6 +77,7 @@ const FamilyMessagesPage = () => {
                   src={`https://api.dicebear.com/9.x/thumbs/svg?seed=${msg.author}`}
                   alt={msg.author}
                   className="message-avatar"
+                  loading="lazy"
                 />
               )}
 

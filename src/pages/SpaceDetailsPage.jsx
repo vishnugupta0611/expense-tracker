@@ -4,6 +4,9 @@ import api from '@services/api';
 import './SpaceDetailsPage.css';
 import BudgetProgress from '@components/expenses/BudgetProgress';
 import SpaceExpenseModal from '@components/spaces/SpaceExpenseModal';
+import VoiceExpenseBtn from '@components/expenses/VoiceExpenseBtn';
+import SuccessNotification from '@components/shared/SuccessNotification';
+import '@components/expenses/QuickAddInput.css';
 
 const SpaceDetailsPage = () => {
   const { id } = useParams();
@@ -25,6 +28,18 @@ const SpaceDetailsPage = () => {
   const [filterDate, setFilterDate] = useState('');
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMember, setFilterMember] = useState('');
+  
+  // Spaces lists for global modal dropdown
+  const [spaces, setSpaces] = useState([]);
+  const [showGlobalQuickAddModal, setShowGlobalQuickAddModal] = useState(false);
+  const [globalQuickAddLoading, setGlobalQuickAddLoading] = useState(false);
+  const [globalQuickAddData, setGlobalQuickAddData] = useState({
+    amount: '',
+    description: '',
+    spaceId: '',
+    category: 'Other'
+  });
+  const [showSuccessNotification, setShowSuccessNotification] = useState(false);
 
   // Comment popup states
   const [commentPopup, setCommentPopup] = useState({ show: false, expenseId: null });
@@ -37,14 +52,16 @@ const SpaceDetailsPage = () => {
 
   const fetchSpaceData = async () => {
     try {
-      const [spaceRes, analyticsRes, expensesRes] = await Promise.all([
+      const [spaceRes, analyticsRes, expensesRes, spacesRes] = await Promise.all([
         api.get(`/spaces/${id}`),
         api.get(`/analytics/space/${id}`), 
-        api.get(`/spaces/${id}/expenses`)
+        api.get(`/spaces/${id}/expenses`),
+        api.get('/spaces').catch(() => ({ data: { spaces: [] } }))
       ]);
       setSpace(spaceRes.data.space || spaceRes.data);
       setAnalytics(analyticsRes.data);
       setExpenses(expensesRes.data.expenses || expensesRes.data);
+      setSpaces(spacesRes.data.spaces || spacesRes.data || []);
       setLoading(false);
       const spaceData = spaceRes.data.space || spaceRes.data;
       setBudgetForm({ monthly: spaceData.budgets?.monthly || 0 });
@@ -53,6 +70,77 @@ const SpaceDetailsPage = () => {
       console.error('Error fetching space details:', error);
       setLoading(false);
     }
+  };
+
+  const openGlobalQuickAdd = () => {
+    if (spaces.length === 0) {
+      if (space) {
+        setSpaces([space]);
+        setGlobalQuickAddData({
+          amount: '',
+          description: '',
+          spaceId: space._id,
+          category: 'Other'
+        });
+        setShowGlobalQuickAddModal(true);
+        return;
+      }
+      alert("Please create a space first!");
+      return;
+    }
+    setGlobalQuickAddData({
+      amount: '',
+      description: '',
+      spaceId: id,
+      category: 'Other'
+    });
+    setShowGlobalQuickAddModal(true);
+  };
+
+  const handleSpaceChange = (e) => {
+    const val = e.target.value;
+    setGlobalQuickAddData(prev => ({ ...prev, spaceId: val }));
+    localStorage.setItem('last_selected_space_id', val);
+  };
+
+  const handleGlobalQuickAddSubmit = async (e) => {
+    e.preventDefault();
+    if (!globalQuickAddData.amount || parseFloat(globalQuickAddData.amount) <= 0 || !globalQuickAddData.spaceId) return;
+
+    try {
+      setGlobalQuickAddLoading(true);
+      await api.post(`/spaces/${globalQuickAddData.spaceId}/expenses`, {
+        amount: parseFloat(globalQuickAddData.amount),
+        description: globalQuickAddData.description,
+        category: globalQuickAddData.category || 'Other'
+      });
+      setShowGlobalQuickAddModal(false);
+      setGlobalQuickAddData(prev => ({
+        ...prev,
+        amount: '',
+        description: '',
+        category: 'Other'
+      }));
+      setShowSuccessNotification(true);
+      fetchSpaceData();
+    } catch (error) {
+      console.error('Failed to add space expense:', error);
+      alert(error.response?.data?.error || 'Failed to add space expense');
+    } finally {
+      setGlobalQuickAddLoading(false);
+    }
+  };
+
+  const handleGlobalVoiceExpense = (expense) => {
+    setShowSuccessNotification(true);
+    setShowGlobalQuickAddModal(false);
+    setGlobalQuickAddData(prev => ({
+      ...prev,
+      amount: '',
+      description: '',
+      category: 'Other'
+    }));
+    fetchSpaceData();
   };
 
   const handleUpdateBudget = async (e) => {
@@ -321,9 +409,6 @@ const SpaceDetailsPage = () => {
             </button>
             <button className="settings-btn-main" onClick={() => setShowSettings(true)}>
               ⚙️ Settings
-            </button>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowAddExpense(true)}>
-              + Add Expense
             </button>
         </div>
       </header>
@@ -639,6 +724,112 @@ const SpaceDetailsPage = () => {
             }}
           />
       )}
+
+      {/* Global Floating Plus Button */}
+      <button
+        className="floating-add-btn"
+        onClick={openGlobalQuickAdd}
+        title="Quick Add Space Expense"
+        style={{ bottom: '90px', right: '18px' }}
+      >
+        +
+      </button>
+
+      {/* Global Quick Add Modal */}
+      {showGlobalQuickAddModal && (
+        <div className="floating-overlay" onClick={() => setShowGlobalQuickAddModal(false)}>
+          <div className="floating-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="floating-modal-header">
+              <span>Add Space Expense</span>
+              <button type="button" className="modal-close-btn" onClick={() => setShowGlobalQuickAddModal(false)}>×</button>
+            </div>
+            <form onSubmit={handleGlobalQuickAddSubmit}>
+              {/* Space Selection Dropdown */}
+              <div className="form-group" style={{ marginBottom: '0.875rem' }}>
+                <label style={{ fontSize: '0.8rem', marginBottom: '0.3rem' }}>Select Space</label>
+                <select
+                  value={globalQuickAddData.spaceId}
+                  onChange={handleSpaceChange}
+                  style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+                  required
+                >
+                  {spaces.map(s => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount Row */}
+              <div className="modal-amount-row">
+                <span className="modal-currency">₹</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="modal-amount-input"
+                  placeholder="0"
+                  value={globalQuickAddData.amount}
+                  onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, amount: e.target.value }))}
+                  disabled={globalQuickAddLoading}
+                  autoFocus
+                  required
+                />
+              </div>
+
+              {/* Description Input + Mic Row */}
+              <div className="modal-note-wrap">
+                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    className="modal-note-input"
+                    placeholder="Note / Description"
+                    value={globalQuickAddData.description}
+                    onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, description: e.target.value }))}
+                    disabled={globalQuickAddLoading}
+                    style={{ flex: 1, margin: 0 }}
+                  />
+                  <VoiceExpenseBtn 
+                    inline 
+                    spaceId={globalQuickAddData.spaceId} 
+                    onExpenseAdded={handleGlobalVoiceExpense} 
+                  />
+                </div>
+              </div>
+
+              {/* Category Dropdown */}
+              <div className="form-group" style={{ marginBottom: '1rem' }}>
+                <label style={{ fontSize: '0.8rem', marginBottom: '0.3rem' }}>Category</label>
+                <select
+                  value={globalQuickAddData.category}
+                  onChange={(e) => setGlobalQuickAddData(prev => ({ ...prev, category: e.target.value }))}
+                  style={{ padding: '0.75rem', fontSize: '1rem', width: '100%' }}
+                >
+                  <option value="Food">🍕 Food</option>
+                  <option value="Transport">🚗 Transport</option>
+                  <option value="Bills">💡 Bills</option>
+                  <option value="Grocery">🛒 Grocery</option>
+                  <option value="Entertainment">🎬 Entertainment</option>
+                  <option value="Other">📦 Other</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="modal-submit-btn"
+                disabled={globalQuickAddLoading || !globalQuickAddData.amount || parseFloat(globalQuickAddData.amount) <= 0}
+              >
+                {globalQuickAddLoading ? 'Adding...' : `Add ₹${globalQuickAddData.amount || '0'} to Space`}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Success Notification */}
+      <SuccessNotification
+        message="Space expense added!"
+        isVisible={showSuccessNotification}
+        onClose={() => setShowSuccessNotification(false)}
+      />
     </div>
   );
 };

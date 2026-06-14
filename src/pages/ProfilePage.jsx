@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '@services/api';
 import { useAuth } from '@context/AuthContext';
+import { useTheme } from '@context/ThemeContext';
 import avatarGifs from '@data/avatarGifs';
 import './ProfilePage.css';
 
 const ProfilePage = () => {
   const { user, login, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
 
   const [name, setName] = useState(user?.name || '');
   const [selectedAvatar, setSelectedAvatar] = useState(user?.avatar || '');
@@ -196,6 +198,19 @@ const ProfilePage = () => {
               <option value="notes">Notes</option>
               <option value="words">Word Library</option>
             </select>
+          </div>
+          <div className="field-row">
+            <label>Theme</label>
+            <button
+              type="button"
+              className={`theme-toggle-btn ${isDark ? 'dark' : 'light'}`}
+              onClick={toggleTheme}
+            >
+              <span className="theme-toggle-thumb" />
+              <span className="theme-toggle-label">
+                {isDark ? '🌙 Dark' : '☀️ Light'}
+              </span>
+            </button>
           </div>
         </div>
 

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@context/AuthContext';
 import api from '@services/api';
-import Banner from '../family-link/components/Banner.jsx';
 import MessagesButton from '../family-link/components/Messages.jsx';
 import Post from '../family-link/components/Post.jsx';
 import './FamilyLinkPage.css';
@@ -90,7 +89,6 @@ const FamilyLinkPage = () => {
 
   return (
     <div className="family-link-page">
-      <Banner />
       <MessagesButton />
       <Post
         posts={posts}

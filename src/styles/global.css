@@ -60,6 +60,51 @@
   box-sizing: border-box;
 }
 
+/* ── Dark Theme Overrides ── */
+body.dark {
+  --primary: #8b93ff;
+  --primary-dark: #6d73f6;
+  --primary-light: rgba(139, 147, 255, 0.16);
+  --primary-subtle: rgba(139, 147, 255, 0.08);
+  --bg-primary: #111827;
+  --bg-secondary: #0b1120;
+  --bg-tertiary: #1f2937;
+  --card-bg: #151f2e;
+  --border-color: #263244;
+  --border-light: #1f2a3a;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #7f8ea3;
+  --success: #34d399;
+  --error: #fb7185;
+  --warning: #fbbf24;
+  --info: #60a5fa;
+  --shadow-xs: 0 1px 2px 0 rgba(0,0,0,0.45);
+  --shadow-sm: 0 10px 30px rgba(0,0,0,0.2);
+  --shadow-md: 0 16px 38px rgba(0,0,0,0.28);
+  --shadow-lg: 0 22px 55px rgba(0,0,0,0.34);
+  --shadow-xl: 0 28px 70px rgba(0,0,0,0.45);
+}
+
+body.dark input[type="text"],
+body.dark input[type="email"],
+body.dark input[type="number"],
+body.dark input[type="password"],
+body.dark input[type="date"],
+body.dark textarea,
+body.dark select {
+  background: #111827;
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+body.dark input:focus,
+body.dark textarea:focus,
+body.dark select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+}
+
 html {
   font-size: 16px;
   -webkit-font-smoothing: antialiased;

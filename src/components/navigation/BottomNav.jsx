@@ -15,6 +15,7 @@ const BottomNav = () => {
     { path: '/expenses', icon: '💰', label: 'Expenses' },
     { path: '/family', icon: '👨‍👩‍👧‍👦', label: 'Family' },
     { path: '/shopping', icon: '🛒', label: 'Shopping' },
+    { path: '/jobs', icon: '💼', label: 'Jobs' },
     { path: '/profile', icon: '👤', label: 'Profile' }
   ];
 

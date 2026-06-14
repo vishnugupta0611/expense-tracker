@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Heart, MessageCircle, Send, MoreVertical, Trash2 } from 'lucide-react';
 import api from '@services/api';
 import './Post.css';
@@ -13,7 +13,7 @@ const defaultPosts = [
     media: [
       {
         type: 'image',
-        url: 'https://images.pexels.com/photos/935985/pexels-photo-935985.jpeg',
+        url: 'https://images.pexels.com/photos/935985/pexels-photo-935985.jpeg?auto=compress&cs=tinysrgb&w=600',
         frameType: 'portrait',
       },
     ],
@@ -36,7 +36,7 @@ const defaultPosts = [
     media: [
       {
         type: 'image',
-        url: 'https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg',
+        url: 'https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg?auto=compress&cs=tinysrgb&w=600',
         frameType: 'square',
       },
     ],
@@ -59,6 +59,22 @@ const fallbackUser = {
 };
 
 const getPostId = (post) => post._id || post.id;
+
+const optimizeImageUrl = (url) => {
+  if (!url) return '';
+  if (url.includes('res.cloudinary.com') && url.includes('/upload/')) {
+    if (!url.includes('/upload/q_auto')) {
+      return url.replace('/upload/', '/upload/q_auto,f_auto,w_600,c_limit/');
+    }
+  }
+  if (url.includes('images.pexels.com')) {
+    if (!url.includes('w=')) {
+      const separator = url.includes('?') ? '&' : '?';
+      return `${url}${separator}auto=compress&cs=tinysrgb&w=600`;
+    }
+  }
+  return url;
+};
 
 const getUserId = (value) => {
   if (!value) return '';
@@ -136,11 +152,11 @@ const FamilyPostList = ({
   const [localPosts, setLocalPosts] = useState(defaultPosts);
   const [commentText, setCommentText] = useState({});
   const [openComments, setOpenComments] = useState({});
-  const [activeSlides, setActiveSlides] = useState({});
   const [pendingLikes, setPendingLikes] = useState({});
   const [pendingComments, setPendingComments] = useState({});
   const [openMenus, setOpenMenus] = useState({});
   const [likeAnimate, setLikeAnimate] = useState({});
+  const sliderRefs = useRef({});
 
   const postItems = posts || localPosts;
   const updatePosts = onPostsChange || setLocalPosts;
@@ -234,14 +250,22 @@ const FamilyPostList = ({
     }
   };
 
-  const moveSlide = (postId, mediaCount, direction) => {
-    setActiveSlides((prev) => {
-      const current = prev[postId] || 0;
-      return {
-        ...prev,
-        [postId]: (current + direction + mediaCount) % mediaCount,
-      };
-    });
+  const handleScroll = (postId, direction, total) => {
+    const slider = sliderRefs.current[postId];
+    if (!slider) return;
+    const width = slider.clientWidth;
+    const currentScroll = slider.scrollLeft;
+    const maxScroll = width * (total - 1);
+    
+    let targetScroll = currentScroll + direction * width;
+    
+    if (targetScroll < -10) {
+      targetScroll = maxScroll;
+    } else if (targetScroll > maxScroll + 10) {
+      targetScroll = 0;
+    }
+    
+    slider.scrollTo({ left: targetScroll, behavior: 'smooth' });
   };
 
   const handleDeletePost = async (postId) => {
@@ -269,9 +293,7 @@ const FamilyPostList = ({
         const media = getMedia(post);
         const imageMedia = media.filter((item) => item.type !== 'video');
         const videoMedia = media.find((item) => item.type === 'video');
-        const activeIndex = activeSlides[postId] || 0;
-        const activeImage = imageMedia[activeIndex] || imageMedia[0];
-        const activeMedia = videoMedia || activeImage || media[0];
+        const activeMedia = videoMedia || imageMedia[0] || media[0];
         const frameClass = activeMedia?.frameType || 'square';
         const likes = post.likes || [];
         const comments = post.comments || [];
@@ -283,7 +305,7 @@ const FamilyPostList = ({
         return (
           <article key={postId} className="family-post-card">
             <div className="family-post-header">
-              <img src={authorAvatar} alt={authorName} className="family-post-avatar" />
+              <img src={optimizeImageUrl(authorAvatar)} alt={authorName} className="family-post-avatar" loading="lazy" />
               <div>
                 <h3>{authorName}</h3>
                 <p>{post.location ? `${post.location} - ` : ''}{formatTime(post.createdAt)}</p>
@@ -318,15 +340,28 @@ const FamilyPostList = ({
               videoMedia ? (
                 <video className={`family-post-media ${frameClass}`} controls src={videoMedia.url} />
               ) : (
-                activeImage && (
-                  <div className="family-post-slider">
-                    <img className={`family-post-media ${frameClass}`} src={activeImage.url} alt={post.caption || post.text || 'Family post'} />
+                imageMedia.length > 0 && (
+                  <div className="family-post-slider-container">
+                    <div
+                      ref={(el) => (sliderRefs.current[postId] = el)}
+                      className="family-post-slider"
+                    >
+                      {imageMedia.map((img, idx) => (
+                        <img
+                          key={idx}
+                          className={`family-post-media ${frameClass}`}
+                          src={optimizeImageUrl(img.url)}
+                          alt={`${post.caption || 'Family post'} - ${idx + 1}`}
+                          loading="lazy"
+                        />
+                      ))}
+                    </div>
                     {imageMedia.length > 1 && (
                       <>
-                        <button type="button" className="family-slider-btn left" onClick={() => moveSlide(postId, imageMedia.length, -1)}>
+                        <button type="button" className="family-slider-btn left" onClick={() => handleScroll(postId, -1, imageMedia.length)}>
                           Prev
                         </button>
-                        <button type="button" className="family-slider-btn right" onClick={() => moveSlide(postId, imageMedia.length, 1)}>
+                        <button type="button" className="family-slider-btn right" onClick={() => handleScroll(postId, 1, imageMedia.length)}>
                           Next
                         </button>
                       </>
