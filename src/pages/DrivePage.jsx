@@ -358,7 +358,7 @@ const DrivePage = () => {
                       {item.mimeType?.startsWith('image/') ? (
                         <img src={item.url} alt={item.name} className="drive-thumb-full" />
                       ) : (
-                        <iframe src={`${item.url}#toolbar=0&navpanes=0&scrollbar=0`} title={item.name} className="drive-thumb-full" style={{ border: 'none', pointerEvents: 'none' }} />
+                        <iframe src={`${item.url}#toolbar=0&navpanes=0&scrollbar=0`} title={item.name} className="drive-thumb-full" scrolling="no" style={{ border: 'none', pointerEvents: 'none', overflow: 'hidden' }} />
                       )}
                       <div className="drive-action-btns">
                         {item.mimeType?.includes('pdf') && (
