@@ -112,11 +112,16 @@ const DrivePage = () => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     e.target.value = '';
-    setPendingFiles(files);
-    setShowFolderPicker(true);
+    
+    if (currentFolder) {
+      uploadFiles(currentFolder, files);
+    } else {
+      setPendingFiles(files);
+      setShowFolderPicker(true);
+    }
   };
 
-  const uploadFiles = async (targetFolderId) => {
+  const uploadFiles = async (targetFolderId, filesToUpload = pendingFiles) => {
     setShowFolderPicker(false);
     setUploading(true);
 
@@ -131,9 +136,9 @@ const DrivePage = () => {
       return;
     }
 
-    for (let i = 0; i < pendingFiles.length; i++) {
-      const file = pendingFiles[i];
-      setUploadProgress(`Uploading ${i + 1}/${pendingFiles.length}: ${file.name}`);
+    for (let i = 0; i < filesToUpload.length; i++) {
+      const file = filesToUpload[i];
+      setUploadProgress(`Uploading ${i + 1}/${filesToUpload.length}: ${file.name}`);
       try {
         // Determine resource type
         let resourceType = 'raw';
@@ -346,19 +351,35 @@ const DrivePage = () => {
                 onDoubleClick={() => item.type === 'folder' ? openFolder(item) : window.open(item.url, '_blank')}
                 onContextMenu={(e) => openCtx(e, item)}
               >
-                {/* Image file — full thumbnail, no overlay */}
-                {item.type === 'file' && item.mimeType?.startsWith('image/') ? (
+                {/* Image or PDF file — full thumbnail, no overlay */}
+                {item.type === 'file' && (item.mimeType?.startsWith('image/') || item.mimeType?.includes('pdf')) ? (
                   <>
                     <div className="drive-img-card">
-                      <img src={item.url} alt={item.name} className="drive-thumb-full" />
-                      <button
-                        className="drive-copy-btn"
-                        title="Copy link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(item.url);
-                        }}
-                      >⎘</button>
+                      {item.mimeType?.startsWith('image/') ? (
+                        <img src={item.url} alt={item.name} className="drive-thumb-full" />
+                      ) : (
+                        <iframe src={`${item.url}#toolbar=0&navpanes=0&scrollbar=0`} title={item.name} className="drive-thumb-full" style={{ border: 'none', pointerEvents: 'none' }} />
+                      )}
+                      <div className="drive-action-btns">
+                        {item.mimeType?.includes('pdf') && (
+                          <button
+                            className="drive-action-btn"
+                            title="Download"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(item.url, '_blank');
+                            }}
+                          >⬇</button>
+                        )}
+                        <button
+                          className="drive-action-btn"
+                          title="Copy link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(item.url);
+                          }}
+                        >⎘</button>
+                      </div>
                     </div>
                     <div className="drive-item-name" title={item.name}>{item.name}</div>
                     <div className="drive-item-meta">{fmtSize(item.size)}</div>
@@ -368,14 +389,24 @@ const DrivePage = () => {
                   <>
                     <div className="drive-file-card">
                       <span className="drive-file-icon">{fileIcon(item.mimeType)}</span>
-                      <button
-                        className="drive-copy-btn"
-                        title="Copy link"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigator.clipboard.writeText(item.url);
-                        }}
-                      >⎘</button>
+                      <div className="drive-action-btns">
+                        <button
+                          className="drive-action-btn"
+                          title="Download"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(item.url, '_blank');
+                          }}
+                        >⬇</button>
+                        <button
+                          className="drive-action-btn"
+                          title="Copy link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(item.url);
+                          }}
+                        >⎘</button>
+                      </div>
                     </div>
                     <div className="drive-item-name" title={item.name}>{item.name}</div>
                     <div className="drive-item-meta">{fmtSize(item.size)}</div>

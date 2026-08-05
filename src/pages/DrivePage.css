@@ -333,7 +333,39 @@
 
 .drive-folder-emoji { font-size: 2.8rem; line-height: 1; }
 
-/* Copy button — top-right of card */
+/* Action buttons group */
+.drive-action-btns {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.drive-item:hover .drive-action-btns { opacity: 1; }
+
+.drive-action-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(255,255,255,0.88);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+  backdrop-filter: blur(4px);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+}
+
+.drive-action-btn:hover { background: white; }
+
+/* Copy button — top-right of card (legacy just in case) */
 .drive-copy-btn {
   position: absolute;
   top: 6px;
