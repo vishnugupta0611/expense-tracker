@@ -231,8 +231,8 @@
 .npub-content pre.note-code .note-code-body {
   display: block;
   padding: 1rem 1.25rem 1.1rem;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  word-break: normal;
   overflow-x: auto;
 }
 

@@ -56,40 +56,86 @@ const blockAttrs = (b) => {
   return styleAttr + colorAttr + fontAttr;
 };
 
+const formatTableHtml = (content) => {
+  if (!content) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+  const trimmed = content.trim();
+  if (trimmed.includes('<tr') || trimmed.includes('<td') || trimmed.includes('<th')) {
+    return trimmed.startsWith('<table')
+      ? trimmed.replace(/^<table[^>]*>/, '').replace(/<\/table>$/, '')
+      : trimmed;
+  }
+  const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+
+  const dataLines = lines.filter(l => !/^[|\s:-]+$/.test(l));
+  if (!dataLines.length) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+
+  const rows = dataLines.map(l => {
+    const raw = l.replace(/^\|/, '').replace(/\|$/, '');
+    return raw.split('|').map(c => c.trim());
+  });
+
+  const header = rows[0];
+  const bodyRows = rows.slice(1);
+
+  let out = '<thead><tr>';
+  header.forEach(h => {
+    out += `<th>${h || '&nbsp;'}</th>`;
+  });
+  out += '</tr></thead>';
+
+  if (bodyRows.length > 0) {
+    out += '<tbody>';
+    bodyRows.forEach(row => {
+      out += '<tr>';
+      for (let i = 0; i < header.length; i++) {
+        out += `<td>${row[i] !== undefined ? row[i] : '&nbsp;'}</td>`;
+      }
+      out += '</tr>';
+    });
+    out += '</tbody>';
+  }
+  return out;
+};
+
 const blocksToHtml = (blocks) => {
   if (!blocks?.length) return '<p><br></p>';
   return blocks.map(b => {
     const a = blockAttrs(b);
     if (b.type === 'image') {
-      const posClass = b.position ? ` note-img-${b.position}` : '';
-      const sizeClass = b.size ? ` note-img-${b.size}` : '';
+      const posClass = b.position ? ` note-img-${b.position}` : ' note-img-center';
+      const sizeClass = b.size ? ` note-img-${b.size}` : ' note-img-medium';
       const posAttr = b.position ? ` data-position="${b.position}"` : '';
       const sizeAttr = b.size ? ` data-size="${b.size}"` : '';
       const captionAttr = b.caption ? ` data-caption="${encodeURIComponent(b.caption)}"` : '';
       const altAttr = b.alt ? ` alt="${b.alt}"` : '';
-      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}" data-saved="1"${posAttr}${sizeAttr}${captionAttr}${altAttr} />`;
+      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}" data-saved="1"${posAttr}${sizeAttr}${captionAttr}${altAttr} contenteditable="false" loading="lazy" />`;
       if (b.caption) {
-        imgTag = `<figure class="note-img-figure${posClass}${sizeClass}">${imgTag}<figcaption class="note-img-caption">${b.caption}</figcaption></figure>`;
+        imgTag = `<figure class="note-img-figure${posClass}${sizeClass}" contenteditable="false">${imgTag}<figcaption class="note-img-caption" contenteditable="true">${b.caption}</figcaption></figure>`;
       }
       return imgTag;
     }
     if (b.type === 'code') {
-      const escaped = b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '';
+      const escaped = (b.content || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
       return `<pre class="note-code" data-lang="code" contenteditable="false"${a}><span class="note-code-header" contenteditable="false">code ● ● ●</span><code class="note-code-body" contenteditable="true">${escaped}</code></pre>`;
     }
-    if (b.type === 'divider') return `<hr class="note-divider" />`;
+    if (b.type === 'divider') return `<hr class="note-divider" contenteditable="false" />`;
     if (b.type === 'ul') return `<ul${a} class="note-list-ul">${b.content}</ul>`;
     if (b.type === 'ol') return `<ol${a} class="note-list-ol">${b.content}</ol>`;
     if (b.type === 'fact') {
-      return `<div class="note-fact-card"${a} contenteditable="false"><span class="note-fact-emoji">💡</span><div class="note-fact-content" contenteditable="true">${b.content}</div></div>`;
+      return `<div class="note-fact-card"${a} contenteditable="false"><span class="note-fact-emoji" contenteditable="false">💡</span><div class="note-fact-content" contenteditable="true">${b.content}</div></div>`;
     }
     if (b.type === 'table') {
-      return `<table class="note-table"${a}>${b.content}</table>`;
+      return `<table class="note-table"${a}>${formatTableHtml(b.content)}</table>`;
     }
     if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(b.type)) {
-      return `<${b.type}${a}>${b.content}</${b.type}>`;
+      return `<${b.type}${a}>${b.content || '<br>'}</${b.type}>`;
     }
-    return `<p${a}>${b.content || '<br>'}</p>`;
+    let text = b.content || '';
+    if (!text.includes('<br') && !text.includes('<p') && text.includes('\n')) {
+      text = text.split('\n').join('<br>');
+    }
+    return `<p${a}>${text || '<br>'}</p>`;
   }).join('');
 };
 
@@ -389,49 +435,7 @@ const NoteEditorPage = () => {
     };
   }, [id, syncToBackend]);
 
-  // Infinite Scroll for Editor Chunks
-  useEffect(() => {
-    if (loading || loadedSeq + 1 >= totalChunks) return;
 
-    const handleScroll = () => {
-      if (fetchingNext) return;
-      
-      const threshold = 350; // trigger fetch 350px before bottom
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - threshold;
-
-      if (scrolledToBottom) {
-        setFetchingNext(true);
-        const nextSeq = loadedSeq + 1;
-        
-        api.get(`/notes/${id}/chunks`, { params: { startSeq: nextSeq, limit: 2 } })
-          .then(r => {
-            const chunks = r.data.chunks || [];
-            if (chunks.length > 0) {
-              const newBlocks = chunks.flatMap(c => c.blocks);
-              if (editorRef.current && newBlocks.length > 0) {
-                // Append new elements to end of contenteditable without resetting innerHTML to preserve cursor
-                const div = document.createElement('div');
-                div.innerHTML = blocksToHtml(newBlocks);
-                while (div.firstChild) {
-                  editorRef.current.appendChild(div.firstChild);
-                }
-                highlightEditor(editorRef.current);
-                
-                // Update hashes cache so autosave diff remains aligned
-                const newHashes = splitIntoChunks(newBlocks).map(chunkHash);
-                lastChunksRef.current = [...lastChunksRef.current, ...newHashes];
-              }
-              setLoadedSeq(prev => prev + chunks.length);
-            }
-          })
-          .catch(err => console.error("Error loading note chunks progressively:", err))
-          .finally(() => setFetchingNext(false));
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [id, loadedSeq, totalChunks, fetchingNext, loading]);
 
   useEffect(() => {
     const el = editorRef.current;
@@ -935,33 +939,6 @@ const NoteEditorPage = () => {
           onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
           placeholder="Untitled"
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <select
-            style={{
-              padding: '0.28rem 0.65rem',
-              fontSize: '0.8rem',
-              borderRadius: '6px',
-              border: '1px solid var(--border-color)',
-              background: 'var(--card-bg)',
-              color: 'var(--text-secondary)',
-              cursor: 'pointer',
-              outline: 'none',
-              maxWidth: '220px',
-            }}
-            value={categoryId || ''}
-            onChange={(e) => {
-              const val = e.target.value || null;
-              setCategoryId(val);
-              categoryIdRef.current = val;
-              scheduleSave();
-            }}
-          >
-            <option value="">📁 No Category</option>
-            {categories.map(c => (
-              <option key={c._id} value={c._id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
         <div
           ref={editorRef}
           className="note-editor-content"
@@ -971,11 +948,6 @@ const NoteEditorPage = () => {
           onKeyDown={handleKeyDown}
           data-placeholder="Start writing…"
         />
-        {fetchingNext && (
-          <div className="npub-scroll-loading">
-            <div className="spinner-mini" /> Loading more blocks...
-          </div>
-        )}
       </div>
 
 

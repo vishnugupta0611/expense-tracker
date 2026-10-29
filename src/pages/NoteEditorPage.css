@@ -251,9 +251,9 @@
   font-size: 0.875rem;
   line-height: 1.6;
   color: #e6edf3;
-  white-space: pre-wrap;
-  word-break: break-all;
-  overflow: hidden;
+  white-space: pre;
+  word-break: normal;
+  overflow-x: auto;
   outline: none;
   position: relative;
   display: flex;
@@ -292,8 +292,9 @@
   padding: 1rem 1.25rem 1.1rem;
   outline: none;
   min-height: 2.5em;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  word-break: normal;
+  overflow-x: auto;
   flex: 1;
 }
 
@@ -1061,5 +1062,43 @@
 .note-img-medium, .note-img-medium img { max-width: 440px; }
 .note-img-large, .note-img-large img { max-width: 640px; }
 .note-img-full, .note-img-full img { width: 100%; max-width: 100%; }
+
+/* ── Clean Table Styling ── */
+.note-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.25rem 0;
+  font-size: 0.875rem;
+  overflow-x: auto;
+  display: table;
+}
+
+.note-table th,
+.note-table td {
+  border: 1px solid var(--border-color);
+  padding: 0.6rem 0.85rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.note-table th {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.note-editor-page.dark .note-table th {
+  background: #1c2128;
+  border-color: #30363d;
+}
+
+.note-editor-page.dark .note-table td {
+  border-color: #30363d;
+}
+
+.note-table tr:hover td {
+  background: rgba(99, 102, 241, 0.04);
+}
+
 
 

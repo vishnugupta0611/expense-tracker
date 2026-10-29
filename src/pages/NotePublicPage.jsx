@@ -16,22 +16,65 @@ const blockAttrs = (b) => {
   return style ? ` style="${style}"` : '';
 };
 
+const formatTableHtml = (content) => {
+  if (!content) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+  const trimmed = content.trim();
+  if (trimmed.includes('<tr') || trimmed.includes('<td') || trimmed.includes('<th')) {
+    return trimmed.startsWith('<table')
+      ? trimmed.replace(/^<table[^>]*>/, '').replace(/<\/table>$/, '')
+      : trimmed;
+  }
+  const lines = trimmed.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+
+  const dataLines = lines.filter(l => !/^[|\s:-]+$/.test(l));
+  if (!dataLines.length) return '<tbody><tr><td>&nbsp;</td></tr></tbody>';
+
+  const rows = dataLines.map(l => {
+    const raw = l.replace(/^\|/, '').replace(/\|$/, '');
+    return raw.split('|').map(c => c.trim());
+  });
+
+  const header = rows[0];
+  const bodyRows = rows.slice(1);
+
+  let out = '<thead><tr>';
+  header.forEach(h => {
+    out += `<th>${h || '&nbsp;'}</th>`;
+  });
+  out += '</tr></thead>';
+
+  if (bodyRows.length > 0) {
+    out += '<tbody>';
+    bodyRows.forEach(row => {
+      out += '<tr>';
+      for (let i = 0; i < header.length; i++) {
+        out += `<td>${row[i] !== undefined ? row[i] : '&nbsp;'}</td>`;
+      }
+      out += '</tr>';
+    });
+    out += '</tbody>';
+  }
+  return out;
+};
+
 const blocksToHtml = (blocks) => {
   if (!blocks?.length) return '<p><br></p>';
   return blocks.map(b => {
+    const a = blockAttrs(b);
     if (b.type === 'image') {
-      const posClass = b.position ? ` note-img-${b.position}` : '';
-      const sizeClass = b.size ? ` note-img-${b.size}` : '';
+      const posClass = b.position ? ` note-img-${b.position}` : ' note-img-center';
+      const sizeClass = b.size ? ` note-img-${b.size}` : ' note-img-medium';
       const altAttr = b.alt ? ` alt="${b.alt}"` : '';
-      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}"${altAttr} />`;
+      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}"${altAttr} loading="lazy" />`;
       if (b.caption) {
         imgTag = `<figure class="note-img-figure${posClass}${sizeClass}">${imgTag}<figcaption class="note-img-caption">${b.caption}</figcaption></figure>`;
       }
       return imgTag;
     }
     if (b.type === 'code') {
-      const escaped = b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '';
-      return `<pre class="note-code" data-lang="code"><span class="note-code-header">code ● ● ●</span><code class="note-code-body">${escaped}</code></pre>`;
+      const escaped = (b.content || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return `<pre class="note-code" data-lang="code"${a}><span class="note-code-header">code ● ● ●</span><code class="note-code-body">${escaped}</code></pre>`;
     }
     if (b.type === 'divider') return `<hr class="note-divider" />`;
     if (b.type === 'ul') return `<ul${a} class="note-list-ul">${b.content}</ul>`;
@@ -40,12 +83,16 @@ const blocksToHtml = (blocks) => {
       return `<div class="note-fact-card"${a}><span class="note-fact-emoji">💡</span><div class="note-fact-content">${b.content}</div></div>`;
     }
     if (b.type === 'table') {
-      return `<table class="note-table"${a}>${b.content}</table>`;
+      return `<table class="note-table"${a}>${formatTableHtml(b.content)}</table>`;
     }
     if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(b.type)) {
-      return `<${b.type}${a}>${b.content}</${b.type}>`;
+      return `<${b.type}${a}>${b.content || '<br>'}</${b.type}>`;
     }
-    return `<p${a}>${b.content || '<br>'}</p>`;
+    let text = b.content || '';
+    if (!text.includes('<br') && !text.includes('<p') && text.includes('\n')) {
+      text = text.split('\n').join('<br>');
+    }
+    return `<p${a}>${text || '<br>'}</p>`;
   }).join('');
 };
 
@@ -65,19 +112,11 @@ const NotePublicPage = () => {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // Pagination states
-  const [loadedSeq, setLoadedSeq] = useState(2);
-  const [totalChunks, setTotalChunks] = useState(0);
-  const [fetchingNext, setFetchingNext] = useState(false);
-
   useEffect(() => {
     api.get(`/notes/public/${id}`)
       .then(r => {
         const fetchedNote = r.data.note;
         setNote(fetchedNote);
-        setTotalChunks(fetchedNote.totalChunks || 1);
-        setLoadedSeq(fetchedNote.blocks?.length ? 1 : 0);
-        
         if (contentRef.current) {
           contentRef.current.innerHTML = fetchedNote.blocks?.length
             ? blocksToHtml(fetchedNote.blocks)
@@ -89,7 +128,6 @@ const NotePublicPage = () => {
       .finally(() => setLoading(false));
   }, [id]);
 
-  // Set initial content and highlight
   useEffect(() => {
     if (note && contentRef.current) {
       contentRef.current.innerHTML = note.blocks?.length
@@ -98,45 +136,6 @@ const NotePublicPage = () => {
       highlightCodeBlocks(contentRef.current);
     }
   }, [note]);
-
-  // Infinite Scroll Listener for Public Page Chunks
-  useEffect(() => {
-    if (loading || notFound || loadedSeq + 1 >= totalChunks) return;
-
-    const handleScroll = () => {
-      if (fetchingNext) return;
-
-      const threshold = 350; // trigger fetch 350px before reaching bottom
-      const scrolledToBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - threshold;
-
-      if (scrolledToBottom) {
-        setFetchingNext(true);
-        const nextSeq = loadedSeq + 1;
-
-        api.get(`/notes/public/${id}/chunks`, { params: { startSeq: nextSeq, limit: 2 } })
-          .then(r => {
-            const chunks = r.data.chunks || [];
-            if (chunks.length > 0) {
-              const newBlocks = chunks.flatMap(c => c.blocks);
-              if (contentRef.current && newBlocks.length > 0) {
-                const div = document.createElement('div');
-                div.innerHTML = blocksToHtml(newBlocks);
-                while (div.firstChild) {
-                  contentRef.current.appendChild(div.firstChild);
-                }
-                highlightCodeBlocks(contentRef.current);
-              }
-              setLoadedSeq(prev => prev + chunks.length);
-            }
-          })
-          .catch(err => console.error("Error loading chunks progressively:", err))
-          .finally(() => setFetchingNext(false));
-      }
-    };
-
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [id, loadedSeq, totalChunks, fetchingNext, loading, notFound]);
 
   const fmt = (d) => new Date(d).toLocaleDateString('en-IN', {
     day: 'numeric', month: 'long', year: 'numeric',
@@ -167,14 +166,9 @@ const NotePublicPage = () => {
         </button>
       </header>
       <div className="npub-body">
-        <h1 className="npub-title">{note.title || 'Untitled'}</h1>
-        <p className="npub-meta">Last updated {fmt(note.updatedAt)}</p>
+        <h1 className="npub-title">{note?.title || 'Untitled'}</h1>
+        <p className="npub-meta">Last updated {fmt(note?.updatedAt)}</p>
         <div ref={contentRef} className="npub-content" />
-        {fetchingNext && (
-          <div className="npub-scroll-loading">
-            <div className="spinner-mini" /> Loading more...
-          </div>
-        )}
       </div>
     </div>
   );
