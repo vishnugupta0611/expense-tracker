@@ -19,8 +19,16 @@ const blockAttrs = (b) => {
 const blocksToHtml = (blocks) => {
   if (!blocks?.length) return '<p><br></p>';
   return blocks.map(b => {
-    const a = blockAttrs(b);
-    if (b.type === 'image') return `<img src="${b.content}" class="note-img" />`;
+    if (b.type === 'image') {
+      const posClass = b.position ? ` note-img-${b.position}` : '';
+      const sizeClass = b.size ? ` note-img-${b.size}` : '';
+      const altAttr = b.alt ? ` alt="${b.alt}"` : '';
+      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}"${altAttr} />`;
+      if (b.caption) {
+        imgTag = `<figure class="note-img-figure${posClass}${sizeClass}">${imgTag}<figcaption class="note-img-caption">${b.caption}</figcaption></figure>`;
+      }
+      return imgTag;
+    }
     if (b.type === 'code') {
       const escaped = b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '';
       return `<pre class="note-code" data-lang="code"><span class="note-code-header">code ● ● ●</span><code class="note-code-body">${escaped}</code></pre>`;

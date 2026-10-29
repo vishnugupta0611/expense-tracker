@@ -1011,3 +1011,55 @@
   transform: translateY(-1px);
 }
 
+/* ── Enhanced Image Presentation Controls ── */
+.note-img {
+  max-width: 100%;
+  border-radius: 8px;
+  display: block;
+  margin: 0.75rem auto;
+  transition: max-width 0.2s ease;
+}
+
+.note-img-figure {
+  margin: 1rem 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.note-img-caption {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  margin-top: 0.35rem;
+  text-align: center;
+}
+
+/* Image placement */
+.note-img-left, figure.note-img-left {
+  align-items: flex-start;
+  text-align: left;
+  margin-left: 0;
+  margin-right: auto;
+}
+.note-img-right, figure.note-img-right {
+  align-items: flex-end;
+  text-align: right;
+  margin-left: auto;
+  margin-right: 0;
+}
+.note-img-center, figure.note-img-center {
+  align-items: center;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+}
+.note-img-top {
+  order: -1;
+}
+
+/* Image sizing */
+.note-img-small, .note-img-small img { max-width: 220px; }
+.note-img-medium, .note-img-medium img { max-width: 440px; }
+.note-img-large, .note-img-large img { max-width: 640px; }
+.note-img-full, .note-img-full img { width: 100%; max-width: 100%; }
+
+

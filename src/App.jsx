@@ -32,6 +32,7 @@ const JobsPage           = lazy(() => import('./pages/JobsPage'));
 const FamilyLinkPage     = lazy(() => import('./pages/FamilyLinkPage'));
 const FamilyMessagesPage = lazy(() => import('./pages/FamilyMessagesPage'));
 const ProfileInfoPage    = lazy(() => import('./pages/ProfileInfoPage'));
+const GlobalSharePage    = lazy(() => import('./pages/GlobalSharePage'));
 import { useEffect } from "react";
 import { getNotificationToken } from "./getNotificationToken";
 
@@ -93,6 +94,7 @@ getNotificationToken();
           <Route path="/family"               element={<ProtectedRoute><FamilyLinkPage /></ProtectedRoute>} />
           <Route path="/family/messages"      element={<ProtectedRoute><FamilyMessagesPage /></ProtectedRoute>} />
           <Route path="/profile-info"         element={<ProtectedRoute><ProfileInfoPage /></ProtectedRoute>} />
+          <Route path="/global-share"         element={<ProtectedRoute><GlobalSharePage /></ProtectedRoute>} />
           <Route path="/notes"                element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
           <Route path="/notes/:id"            element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
           <Route path="/p/notes/:id"          element={<NotePublicPage />} />

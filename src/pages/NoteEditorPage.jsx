@@ -60,7 +60,19 @@ const blocksToHtml = (blocks) => {
   if (!blocks?.length) return '<p><br></p>';
   return blocks.map(b => {
     const a = blockAttrs(b);
-    if (b.type === 'image') return `<img src="${b.content}" class="note-img" data-saved="1" />`;
+    if (b.type === 'image') {
+      const posClass = b.position ? ` note-img-${b.position}` : '';
+      const sizeClass = b.size ? ` note-img-${b.size}` : '';
+      const posAttr = b.position ? ` data-position="${b.position}"` : '';
+      const sizeAttr = b.size ? ` data-size="${b.size}"` : '';
+      const captionAttr = b.caption ? ` data-caption="${encodeURIComponent(b.caption)}"` : '';
+      const altAttr = b.alt ? ` alt="${b.alt}"` : '';
+      let imgTag = `<img src="${b.content}" class="note-img${posClass}${sizeClass}" data-saved="1"${posAttr}${sizeAttr}${captionAttr}${altAttr} />`;
+      if (b.caption) {
+        imgTag = `<figure class="note-img-figure${posClass}${sizeClass}">${imgTag}<figcaption class="note-img-caption">${b.caption}</figcaption></figure>`;
+      }
+      return imgTag;
+    }
     if (b.type === 'code') {
       const escaped = b.content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') || '';
       return `<pre class="note-code" data-lang="code" contenteditable="false"${a}><span class="note-code-header" contenteditable="false">code ● ● ●</span><code class="note-code-body" contenteditable="true">${escaped}</code></pre>`;
@@ -97,7 +109,33 @@ const htmlToBlocks = (el) => {
     if (tag === 'img') {
       const src = node.getAttribute('src') || node.src;
       if (src && !src.startsWith('blob:') && !node.getAttribute('data-placeholder')) {
-        blocks.push({ type: 'image', content: src });
+        const position = node.getAttribute('data-position') || '';
+        const size = node.getAttribute('data-size') || '';
+        const captionRaw = node.getAttribute('data-caption');
+        const caption = captionRaw ? decodeURIComponent(captionRaw) : '';
+        const alt = node.getAttribute('alt') || '';
+        const imgBlock = { type: 'image', content: src };
+        if (position) imgBlock.position = position;
+        if (size) imgBlock.size = size;
+        if (caption) imgBlock.caption = caption;
+        if (alt) imgBlock.alt = alt;
+        blocks.push(imgBlock);
+      }
+    } else if (tag === 'figure' && node.querySelector('img')) {
+      const img = node.querySelector('img');
+      const src = img.getAttribute('src') || img.src;
+      if (src && !src.startsWith('blob:') && !img.getAttribute('data-placeholder')) {
+        const position = img.getAttribute('data-position') || '';
+        const size = img.getAttribute('data-size') || '';
+        const captionEl = node.querySelector('figcaption');
+        const caption = captionEl ? captionEl.textContent : (img.getAttribute('data-caption') ? decodeURIComponent(img.getAttribute('data-caption')) : '');
+        const alt = img.getAttribute('alt') || '';
+        const imgBlock = { type: 'image', content: src };
+        if (position) imgBlock.position = position;
+        if (size) imgBlock.size = size;
+        if (caption) imgBlock.caption = caption;
+        if (alt) imgBlock.alt = alt;
+        blocks.push(imgBlock);
       }
     } else if (tag === 'hr') {
       blocks.push({ type: 'divider', content: '' });
@@ -181,12 +219,21 @@ const NoteEditorPage = () => {
   const lastChunksRef = useRef([]);
 
   const [title, setTitle]           = useState('Untitled');
+  const [categories, setCategories] = useState([]);
+  const [categoryId, setCategoryId] = useState(null);
+  const categoryIdRef               = useRef(null);
   const [loading, setLoading]       = useState(true);
   const [saveStatus, setSaveStatus] = useState('saved');
   const [copied, setCopied]         = useState(false);
   const [urlModal, setUrlModal]     = useState(false);
   const [imageUrlInput, setImageUrlInput] = useState('');
   const { dark, toggle: toggleTheme } = useNotesTheme();
+
+  useEffect(() => {
+    api.get('/categories')
+      .then(r => setCategories(r.data.categories || []))
+      .catch(() => {});
+  }, []);
 
   // Progressive Chunk Loading States
   const [loadedSeq, setLoadedSeq] = useState(2);
@@ -231,6 +278,9 @@ const NoteEditorPage = () => {
         
         titleRef.current = t;
         setTitle(t);
+        const cat = note.categoryId?._id || note.categoryId || null;
+        setCategoryId(cat);
+        categoryIdRef.current = cat;
         setLoading(false);
         titleRef._lastSaved = t;
 
@@ -295,6 +345,7 @@ const NoteEditorPage = () => {
 
       await api.patch(`/notes/${id}/chunks`, {
         title: titleRef.current,
+        categoryId: categoryIdRef.current || null,
         dirty,
         ...(deleteFrom !== undefined && { deleteFrom }),
       });
@@ -884,6 +935,33 @@ const NoteEditorPage = () => {
           onChange={e => { titleRef.current = e.target.value; setTitle(e.target.value); scheduleSave(); }}
           placeholder="Untitled"
         />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <select
+            style={{
+              padding: '0.28rem 0.65rem',
+              fontSize: '0.8rem',
+              borderRadius: '6px',
+              border: '1px solid var(--border-color)',
+              background: 'var(--card-bg)',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              outline: 'none',
+              maxWidth: '220px',
+            }}
+            value={categoryId || ''}
+            onChange={(e) => {
+              const val = e.target.value || null;
+              setCategoryId(val);
+              categoryIdRef.current = val;
+              scheduleSave();
+            }}
+          >
+            <option value="">📁 No Category</option>
+            {categories.map(c => (
+              <option key={c._id} value={c._id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
         <div
           ref={editorRef}
           className="note-editor-content"

@@ -150,6 +150,11 @@ const ProfilePage = () => {
         <span className="shortcut-label">My Drive</span>
         <span className="shortcut-arrow">→</span>
       </Link>
+      <Link to="/global-share" className="profile-shortcut">
+        <span className="shortcut-icon">TG</span>
+        <span className="shortcut-label">Global Share with Telegram</span>
+        <span className="shortcut-arrow">→</span>
+      </Link>
       <Link to="/words" className="profile-shortcut">
         <span className="shortcut-icon">📖</span>
         <span className="shortcut-label">Word Library</span>
