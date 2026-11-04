@@ -28,7 +28,16 @@
     "react-dom": "^19.2.0",
     "react-router-dom": "^7.13.0",
     "react-spring": "^10.0.3",
-    "three": "^0.182.0"
+    "three": "^0.182.0",
+    "@tiptap/core": "3.32.2",
+    "@tiptap/extension-highlight": "3.32.2",
+    "@tiptap/extension-image": "3.32.2",
+    "@tiptap/extension-placeholder": "3.32.2",
+    "@tiptap/extension-table": "3.32.2",
+    "@tiptap/extension-text-style": "3.32.2",
+    "@tiptap/pm": "3.32.2",
+    "@tiptap/react": "3.32.2",
+    "@tiptap/starter-kit": "3.32.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
