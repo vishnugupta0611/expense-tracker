@@ -6,8 +6,8 @@ import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import './NotePublicPage.css';
 import { useEditor, EditorContent } from '@tiptap/react';
-import { notesExtensions } from '@utils/notes/tiptapExtensions';
-import { legacyBlocksToTiptapDocument } from '@utils/notes/legacyBlocksToTiptap';
+import { notesExtensions } from '@/utils/notes/tiptapExtensions';
+import { legacyBlocksToTiptapDocument } from '@/utils/notes/legacyBlocksToTiptap';
 
 const blockAttrs = (b) => {
   let style = '';
