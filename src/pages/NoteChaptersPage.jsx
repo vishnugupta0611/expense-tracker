@@ -478,6 +478,18 @@ const NoteChaptersPage = () => {
     editor.chain().focus().setTextSelection(position).scrollIntoView().run();
   };
 
+  const copyLocalChapterJson = async () => {
+    if (!editor) return;
+    const content = JSON.stringify(editor.getJSON(), null, 2);
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      window.prompt('Copy your local chapter JSON:', content);
+    }
+  };
+
   const insertFactCard = () => {
     if (!editor) return;
     editor.chain().focus().insertContent({
@@ -739,7 +751,12 @@ const NoteChaptersPage = () => {
             <div className={'note-chapters-message ' + (saveStatus === 'conflict' ? 'warning' : '')}>
               <span>{errorMessage}</span>
               {saveStatus === 'conflict' ? (
-                <button type="button" onClick={() => window.location.reload()}>Reload chapter</button>
+                <>
+                  <button type="button" onClick={copyLocalChapterJson}>
+                    {copied ? 'Copied local JSON' : 'Copy local JSON'}
+                  </button>
+                  <button type="button" onClick={() => window.location.reload()}>Reload chapter</button>
+                </>
               ) : null}
             </div>
           ) : null}
