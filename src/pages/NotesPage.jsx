@@ -169,7 +169,7 @@ const NotesPage = () => {
       const response = await api.post('/notes', { categoryId });
       const note = response.data.note;
       navigate(
-        `/notes/${note._id}?category=${encodeURIComponent(selectedCategoryId)}`
+        `/notes/${note._id}/chapters?category=${encodeURIComponent(selectedCategoryId)}`
       );
     } catch (error) {
       console.error('Failed to create note:', error);
@@ -180,7 +180,7 @@ const NotesPage = () => {
 
   const openNote = (note) => {
     navigate(
-      `/notes/${note._id}?category=${encodeURIComponent(selectedCategoryId)}`
+      `/notes/${note._id}/chapters?category=${encodeURIComponent(selectedCategoryId)}`
     );
   };
 
