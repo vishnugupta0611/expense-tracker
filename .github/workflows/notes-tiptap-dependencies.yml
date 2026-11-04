@@ -1,4 +1,4 @@
-name: Notes Tiptap dependency build
+name: Notes Tiptap build
 
 on:
   push:
@@ -6,18 +6,29 @@ on:
       - feat/notes-tiptap-migration
     paths:
       - package.json
+      - package-lock.json
+      - src/**
+      - vite.config.js
+      - .github/workflows/notes-tiptap-dependencies.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - package.json
+      - package-lock.json
+      - src/**
+      - vite.config.js
+      - .github/workflows/notes-tiptap-dependencies.yml
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  install-and-build:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout feature branch
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -25,18 +36,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install locked dependencies
+        run: npm ci
 
       - name: Build frontend
         run: npm run build
-
-      - name: Commit generated lockfile
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          if ! git diff --cached --quiet; then
-            git commit -m "chore(notes): update Tiptap dependency lockfile"
-            git push origin "HEAD:${GITHUB_REF_NAME}"
-          fi
