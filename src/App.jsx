@@ -1,5 +1,5 @@
-import { lazy, Suspense, useState, useCallback } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useState, useCallback, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@context/AuthContext';
 import { TodoProvider } from '@context/TodoContext';
 import { ThemeProvider } from '@context/ThemeContext';
@@ -23,7 +23,6 @@ const HistoryPage        = lazy(() => import('./pages/HistoryPage'));
 const SchedulePage       = lazy(() => import('./pages/SchedulePage'));
 const TodoPage           = lazy(() => import('./pages/TodoPage'));
 const NotesPage          = lazy(() => import('./pages/NotesPage'));
-const NoteEditorPage     = lazy(() => import('./pages/NoteEditorPage'));
 const NoteChaptersPage   = lazy(() => import('./pages/NoteChaptersPage'));
 const NotePublicPage     = lazy(() => import('./pages/NotePublicPage'));
 const DrivePage          = lazy(() => import('./pages/DrivePage'));
@@ -34,11 +33,13 @@ const FamilyLinkPage     = lazy(() => import('./pages/FamilyLinkPage'));
 const FamilyMessagesPage = lazy(() => import('./pages/FamilyMessagesPage'));
 const ProfileInfoPage    = lazy(() => import('./pages/ProfileInfoPage'));
 const GlobalSharePage    = lazy(() => import('./pages/GlobalSharePage'));
-import { useEffect } from "react";
-import { getNotificationToken } from "./getNotificationToken";
 
-
-
+const LegacyNoteRedirect = () => {
+  const { id } = useParams();
+  const [searchParams] = useSearchParams();
+  const query = searchParams.toString();
+  return <Navigate to={`/notes/${id}/chapters${query ? `?${query}` : ''}`} replace />;
+};
 
 const LoadingScreen = () => (
   <div style={{
@@ -63,15 +64,10 @@ const ProtectedRoute = ({ children }) => {
 };
 
 const AppContent = () => {
-
-  useEffect(()=>{
-
-getNotificationToken();
-
-},[]);
+  useEffect(() => {
+    getNotificationToken();
+  }, []);
   const { user, loading } = useAuth();
-
-  console.log(user)
 
   if (loading) return <LoadingScreen />;
 
@@ -97,8 +93,8 @@ getNotificationToken();
           <Route path="/profile-info"         element={<ProtectedRoute><ProfileInfoPage /></ProtectedRoute>} />
           <Route path="/global-share"         element={<ProtectedRoute><GlobalSharePage /></ProtectedRoute>} />
           <Route path="/notes"                element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
-          <Route path="/notes/:id/chapters"  element={<ProtectedRoute><NoteChaptersPage /></ProtectedRoute>} />
-          <Route path="/notes/:id"            element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
+          <Route path="/notes/:id/chapters"   element={<ProtectedRoute><NoteChaptersPage /></ProtectedRoute>} />
+          <Route path="/notes/:id"            element={<ProtectedRoute><LegacyNoteRedirect /></ProtectedRoute>} />
           <Route path="/p/notes/:id"          element={<NotePublicPage />} />
           <Route path="/drive"                element={<ProtectedRoute><DrivePage /></ProtectedRoute>} />
           <Route path="/words"                element={<ProtectedRoute><WordLibraryPage /></ProtectedRoute>} />
@@ -119,12 +115,12 @@ function App() {
   return (
     <Router>
       <ThemeProvider>
-      <AuthProvider>
-        <TodoProvider>
-          {!splashDone && <SplashScreen onDone={handleSplashDone} />}
-          {splashDone && <AppContent />}
-        </TodoProvider>
-      </AuthProvider>
+        <AuthProvider>
+          <TodoProvider>
+            {!splashDone && <SplashScreen onDone={handleSplashDone} />}
+            {splashDone && <AppContent />}
+          </TodoProvider>
+        </AuthProvider>
       </ThemeProvider>
     </Router>
   );
