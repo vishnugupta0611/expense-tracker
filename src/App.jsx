@@ -24,6 +24,7 @@ const SchedulePage       = lazy(() => import('./pages/SchedulePage'));
 const TodoPage           = lazy(() => import('./pages/TodoPage'));
 const NotesPage          = lazy(() => import('./pages/NotesPage'));
 const NoteEditorPage     = lazy(() => import('./pages/NoteEditorPage'));
+const NoteChaptersPage   = lazy(() => import('./pages/NoteChaptersPage'));
 const NotePublicPage     = lazy(() => import('./pages/NotePublicPage'));
 const DrivePage          = lazy(() => import('./pages/DrivePage'));
 const WordLibraryPage    = lazy(() => import('./pages/WordLibraryPage'));
@@ -96,6 +97,7 @@ getNotificationToken();
           <Route path="/profile-info"         element={<ProtectedRoute><ProfileInfoPage /></ProtectedRoute>} />
           <Route path="/global-share"         element={<ProtectedRoute><GlobalSharePage /></ProtectedRoute>} />
           <Route path="/notes"                element={<ProtectedRoute><NotesPage /></ProtectedRoute>} />
+          <Route path="/notes/:id/chapters"  element={<ProtectedRoute><NoteChaptersPage /></ProtectedRoute>} />
           <Route path="/notes/:id"            element={<ProtectedRoute><NoteEditorPage /></ProtectedRoute>} />
           <Route path="/p/notes/:id"          element={<NotePublicPage />} />
           <Route path="/drive"                element={<ProtectedRoute><DrivePage /></ProtectedRoute>} />
