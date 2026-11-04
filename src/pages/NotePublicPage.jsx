@@ -5,6 +5,9 @@ import { useNotesTheme } from '@hooks/useNotesTheme';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
 import './NotePublicPage.css';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { notesExtensions } from '@utils/notes/tiptapExtensions';
+import { legacyBlocksToTiptapDocument } from '@utils/notes/legacyBlocksToTiptap';
 
 const blockAttrs = (b) => {
   let style = '';
@@ -104,6 +107,35 @@ const highlightCodeBlocks = (el) => {
   });
 };
 
+const PublicChapterContent = ({ chapter }) => {
+  const document = chapter.document?.type === 'doc'
+    ? chapter.document
+    : legacyBlocksToTiptapDocument(chapter.legacyBlocks || []);
+
+  const editor = useEditor({
+    extensions: notesExtensions,
+    content: document,
+    editable: false,
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: 'npub-tiptap-content',
+        'aria-label': `Chapter: ${chapter.title || 'Untitled chapter'}`,
+      },
+    },
+  });
+
+  return (
+    <section className="npub-chapter">
+      <h2 className="npub-chapter-title">{chapter.title || 'Untitled chapter'}</h2>
+      {chapter.description ? (
+        <p className="npub-chapter-description">{chapter.description}</p>
+      ) : null}
+      <EditorContent editor={editor} />
+    </section>
+  );
+};
+
 const NotePublicPage = () => {
   const { id } = useParams();
   const contentRef = useRef(null);
@@ -117,7 +149,7 @@ const NotePublicPage = () => {
       .then(r => {
         const fetchedNote = r.data.note;
         setNote(fetchedNote);
-        if (contentRef.current) {
+        if (!fetchedNote.chapters?.length && contentRef.current) {
           contentRef.current.innerHTML = fetchedNote.blocks?.length
             ? blocksToHtml(fetchedNote.blocks)
             : '<p>This note is empty.</p>';
@@ -129,7 +161,7 @@ const NotePublicPage = () => {
   }, [id]);
 
   useEffect(() => {
-    if (note && contentRef.current) {
+    if (note && !note.chapters?.length && contentRef.current) {
       contentRef.current.innerHTML = note.blocks?.length
         ? blocksToHtml(note.blocks)
         : '<p>This note is empty.</p>';
@@ -168,7 +200,15 @@ const NotePublicPage = () => {
       <div className="npub-body">
         <h1 className="npub-title">{note?.title || 'Untitled'}</h1>
         <p className="npub-meta">Last updated {fmt(note?.updatedAt)}</p>
-        <div ref={contentRef} className="npub-content" />
+        {note?.chapters?.length ? (
+          <div className="npub-chapters">
+            {note.chapters.map((chapter) => (
+              <PublicChapterContent key={chapter._id} chapter={chapter} />
+            ))}
+          </div>
+        ) : (
+          <div ref={contentRef} className="npub-content" />
+        )}
       </div>
     </div>
   );
