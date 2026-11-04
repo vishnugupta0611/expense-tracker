@@ -266,12 +266,14 @@ const NotesPage = () => {
                     title="Rename category"
                     aria-label={`Rename ${category.name}`}
                     onClick={(event) => renameCategory(event, category)}
+                    onKeyDown={(event) => event.stopPropagation()}
                   >✎</button>
                   <button
                     type="button"
                     title="Delete category"
                     aria-label={`Delete ${category.name}`}
                     onClick={(event) => deleteCategory(event, category)}
+                    onKeyDown={(event) => event.stopPropagation()}
                   >⋯</button>
                 </div>
               </article>
