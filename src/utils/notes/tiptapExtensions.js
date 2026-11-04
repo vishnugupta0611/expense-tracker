@@ -66,7 +66,7 @@ const ImageWithMetadata = Image.extend({
       'span',
       mergeAttributes(
         {
-          class: \`note-image-wrap note-img-\${position} note-img-\${size}\`,
+          class: `note-image-wrap note-img-${position} note-img-${size}`,
           'data-position': position,
           'data-size': size,
           ...(caption ? { 'data-caption': caption } : {}),
