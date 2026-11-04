@@ -148,11 +148,7 @@ const NoteChaptersPage = () => {
       saveTimerRef.current = null;
     }
 
-    if (savePromiseRef.current) {
-      await savePromiseRef.current;
-      if (dirtyRef.current && readyRef.current) return saveNow();
-      return;
-    }
+    if (savePromiseRef.current) return savePromiseRef.current;
 
     if (
       !editor ||
@@ -165,49 +161,56 @@ const NoteChaptersPage = () => {
     }
 
     const savingChapterId = activeChapterId;
-    const savingGeneration = generationRef.current;
-    const document = editor.getJSON();
-    setSaveStatus('saving');
+    const saveLoop = (async () => {
+      while (
+        dirtyRef.current &&
+        readyRef.current &&
+        chapterIdRef.current === savingChapterId
+      ) {
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
 
-    const request = api.put(
-      '/notes/' + id + '/chapters/' + savingChapterId + '/content',
-      {
-        document,
-        revision: revisionRef.current,
-      }
-    );
-    savePromiseRef.current = request;
+        const savingGeneration = generationRef.current;
+        const document = editor.getJSON();
+        setSaveStatus('saving');
 
-    try {
-      const response = await request;
-      if (chapterIdRef.current !== savingChapterId) return;
+        try {
+          const response = await api.put(
+            '/notes/' + id + '/chapters/' + savingChapterId + '/content',
+            {
+              document,
+              revision: revisionRef.current,
+            }
+          );
 
-      revisionRef.current = response.data.revision;
-      if (generationRef.current === savingGeneration) {
-        dirtyRef.current = false;
-        setSaveStatus('saved');
-      } else {
-        dirtyRef.current = true;
-        setSaveStatus('unsaved');
-      }
-
-      await refreshChunkEntries();
-    } catch (error) {
-      if (chapterIdRef.current === savingChapterId) {
-        setSaveStatus(error.response?.status === 409 ? 'conflict' : 'unsaved');
-        if (error.response?.status === 409) {
-          setErrorMessage('This chapter changed elsewhere. Reload it before saving more edits.');
-        } else {
-          setErrorMessage(error.response?.data?.error || 'Could not save this chapter. Your edits are still on this screen.');
+          if (chapterIdRef.current !== savingChapterId) return;
+          revisionRef.current = response.data.revision;
+          dirtyRef.current = generationRef.current !== savingGeneration;
+          setSaveStatus(dirtyRef.current ? 'unsaved' : 'saved');
+          await refreshChunkEntries();
+        } catch (error) {
+          if (chapterIdRef.current === savingChapterId) {
+            setSaveStatus(error.response?.status === 409 ? 'conflict' : 'unsaved');
+            if (error.response?.status === 409) {
+              setErrorMessage('This chapter changed elsewhere. Reload it before saving more edits.');
+            } else {
+              setErrorMessage(error.response?.data?.error || 'Could not save this chapter. Your edits are still on this screen.');
+            }
+          }
+          throw error;
         }
       }
-      throw error;
-    } finally {
-      savePromiseRef.current = null;
-    }
+    })();
 
-    if (dirtyRef.current && chapterIdRef.current === activeChapterId) {
-      return saveNow();
+    savePromiseRef.current = saveLoop;
+    try {
+      await saveLoop;
+    } finally {
+      if (savePromiseRef.current === saveLoop) {
+        savePromiseRef.current = null;
+      }
     }
   }, [activeChapterId, editor, id, refreshChunkEntries]);
 
@@ -566,7 +569,7 @@ const NoteChaptersPage = () => {
             type="button"
             className="note-chapters-save-btn"
             onClick={() => saveNow().catch(() => {})}
-            disabled={!dirtyRef.current || saveStatus === 'saving' || chapterLoading}
+            disabled={!dirtyRef.current || saveStatus === 'saving' || saveStatus === 'conflict' || chapterLoading}
           >
             <Save size={15} />
             Save
@@ -687,7 +690,7 @@ const NoteChaptersPage = () => {
               />
             </div>
             <div className="note-chapters-workbar-actions">
-              <button type="button" onClick={() => saveNow().catch(() => {})} disabled={!dirtyRef.current || saveStatus === 'saving'}>
+              <button type="button" onClick={() => saveNow().catch(() => {})} disabled={!dirtyRef.current || saveStatus === 'saving' || saveStatus === 'conflict'}>
                 <Save size={15} /> Save now
               </button>
             </div>
