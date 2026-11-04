@@ -136,7 +136,7 @@ function inlineNodesFromDom(nodes, inheritedMarks = []) {
 
     if (tag === 'img') {
       const image = imageNode(node);
-      if (image) result.push(image);
+      if (image) result.push({ type: 'paragraph', content: [image] });
       continue;
     }
 
@@ -283,7 +283,7 @@ function htmlBlocksFromDom(nodes) {
       const img = node.querySelector('img');
       const caption = node.querySelector('figcaption')?.textContent || '';
       const image = imageNode(img, { caption });
-      if (image) result.push(image);
+      if (image) result.push({ type: 'paragraph', content: [image] });
     } else if (tag === 'img') {
       const image = imageNode(node);
       if (image) result.push(image);
@@ -351,7 +351,7 @@ function legacyBlockToTiptapNode(block) {
       size: block.size || 'medium',
       caption: block.caption || '',
     });
-    return image;
+    return image ? { type: 'paragraph', content: [image] } : null;
   }
 
   if (block.type === 'divider') return { type: 'horizontalRule' };
