@@ -192,8 +192,12 @@ const NoteChaptersPage = () => {
           await refreshChunkEntries();
         } catch (error) {
           if (chapterIdRef.current === savingChapterId) {
-            setSaveStatus(error.response?.status === 409 ? 'conflict' : 'unsaved');
-            if (error.response?.status === 409) {
+            const recoveryRequired = error.response?.data?.recoveryRequired === true;
+            const conflict = error.response?.status === 409 || recoveryRequired;
+            setSaveStatus(conflict ? 'conflict' : 'unsaved');
+            if (recoveryRequired) {
+              setErrorMessage('The save failed and the server could not fully restore the previous chunks. Copy your local content before reloading.');
+            } else if (error.response?.status === 409) {
               setErrorMessage('This chapter changed elsewhere. Reload it before saving more edits.');
             } else {
               setErrorMessage(error.response?.data?.error || 'Could not save this chapter. Your edits are still on this screen.');
