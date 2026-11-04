@@ -62,7 +62,7 @@ const buildChunkEntries = (chunks, editor) => {
       nodes,
       startPosition,
       charCount: chunk.charCount || text.length,
-      preview: text.replace(/\\s+/g, ' ').trim().slice(0, 88),
+      preview: text.replace(/\s+/g, ' ').trim().slice(0, 88),
     };
   });
 };
