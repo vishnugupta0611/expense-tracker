@@ -61,8 +61,17 @@ function marksFromElement(element, inherited = []) {
   if (color) styles.color = color;
   if (font === 'serif') styles.fontFamily = 'Georgia, serif';
   if (font === 'mono') styles.fontFamily = "'Courier New', monospace";
-  if (font === 'italic') marks = addMark(marks, { type: 'italic' });
-  if (font === 'bold') marks = addMark(marks, { type: 'bold' });
+  if (element.style?.fontFamily) styles.fontFamily = element.style.fontFamily;
+  if (font === 'italic' || element.style?.fontStyle === 'italic') {
+    marks = addMark(marks, { type: 'italic' });
+  }
+  if (
+    font === 'bold' ||
+    element.style?.fontWeight === 'bold' ||
+    Number(element.style?.fontWeight) >= 600
+  ) {
+    marks = addMark(marks, { type: 'bold' });
+  }
 
   if (Object.keys(styles).length) {
     marks = addMark(marks, { type: 'textStyle', attrs: styles });
@@ -138,13 +147,16 @@ function inlineNodesFromDom(nodes, inheritedMarks = []) {
 }
 
 function paragraphFromDom(element, marks = []) {
-  const content = inlineNodesFromDom(element?.childNodes, marks);
+  const elementMarks = element?.nodeType === Node.ELEMENT_NODE
+    ? marksFromElement(element, marks)
+    : marks;
+  const content = inlineNodesFromDom(element?.childNodes, elementMarks);
   return { type: 'paragraph', ...(content.length ? { content } : {}) };
 }
 
 function headingFromDom(element) {
   const level = Number(element.tagName.slice(1));
-  const content = inlineNodesFromDom(element.childNodes);
+  const content = inlineNodesFromDom(element.childNodes, marksFromElement(element));
   return {
     type: 'heading',
     attrs: { level: Number.isInteger(level) && level >= 1 && level <= 6 ? level : 1 },
@@ -153,6 +165,7 @@ function headingFromDom(element) {
 }
 
 function listItemFromDom(element, marks = []) {
+  marks = marksFromElement(element, marks);
   const content = [];
   let inlineBuffer = [];
 
@@ -186,6 +199,7 @@ function listItemFromDom(element, marks = []) {
 }
 
 function listFromDom(element, marks = []) {
+  marks = marksFromElement(element, marks);
   const ordered = element.tagName.toLowerCase() === 'ol';
   const items = Array.from(element.children)
     .filter((child) => child.tagName.toLowerCase() === 'li')
@@ -205,7 +219,7 @@ function tableFromDom(element, marks = []) {
     const cells = Array.from(row.children)
       .filter((cell) => ['td', 'th'].includes(cell.tagName.toLowerCase()))
       .map((cell) => {
-        const inline = inlineNodesFromDom(cell.childNodes, marks);
+        const inline = inlineNodesFromDom(cell.childNodes, marksFromElement(cell, marks));
         const cellContent = inline.length
           ? [{ type: 'paragraph', content: inline }]
           : [EMPTY_PARAGRAPH];
