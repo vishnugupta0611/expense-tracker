@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { EditorContent, useEditor } from '@tiptap/react';
 import {
-  ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight,
+  ArrowLeft, BookOpen, ChevronLeft, ChevronRight,
   Code2, ImagePlus, List, ListOrdered, Plus, Quote, Save,
   Share2, Table2, Trash2, Type, X, Heading1, Heading2, Heading3,
-  Bold, Italic, Underline, Highlighter, PanelLeft, GripVertical,
+  Bold, Italic, Underline, Highlighter, PanelLeft,
 } from 'lucide-react';
 import api from '@services/api';
 import { useNotesTheme } from '@hooks/useNotesTheme';
@@ -90,7 +90,6 @@ const NoteChaptersPage = () => {
   const [copied, setCopied] = useState(false);
   const [textColor, setTextColor] = useState('#4f46e5');
 
-  const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const chapterIdRef = useRef(null);
   const revisionRef = useRef(0);
