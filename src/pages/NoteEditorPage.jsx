@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import api from '@services/api';
 import { useNotesTheme } from '@hooks/useNotesTheme';
 import hljs from 'highlight.js';
@@ -256,6 +256,8 @@ const highlightEditor = (el) => {
 const NoteEditorPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnCategory = searchParams.get('category');
   const editorRef   = useRef(null);
   const fileInputRef = useRef(null);
   const saveTimer   = useRef(null);
@@ -907,7 +909,7 @@ const NoteEditorPage = () => {
       }}
     >
       <header className="note-editor-header" onClick={e => e.stopPropagation()}>
-        <button className="note-back-btn" onClick={() => navigate('/notes')}>← Notes</button>
+        <button className="note-back-btn" onClick={() => navigate(returnCategory ? `/notes?category=${encodeURIComponent(returnCategory)}` : '/notes')}>← Notes</button>
         <div className="note-editor-actions">
           {/* Prevent blur using onMouseDown */}
           <button className="note-img-upload-btn" onMouseDown={e => e.preventDefault()} onClick={triggerImageUpload} title="Insert image from file">
