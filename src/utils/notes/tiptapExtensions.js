@@ -1,6 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import Image from '@tiptap/extension-image';
-import { Highlight } from '@tiptap/extension-highlight';
+import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import { TableKit } from '@tiptap/extension-table';
 import { TextStyleKit } from '@tiptap/extension-text-style';
