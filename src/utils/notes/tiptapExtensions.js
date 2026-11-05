@@ -8,6 +8,7 @@ import StarterKit from '@tiptap/starter-kit';
 
 const ImageWithMetadata = Image.extend({
   inline: true,
+  group: 'inline',
 
   addAttributes() {
     return {
