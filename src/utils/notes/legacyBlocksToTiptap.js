@@ -136,7 +136,7 @@ function inlineNodesFromDom(nodes, inheritedMarks = []) {
 
     if (tag === 'img') {
       const image = imageNode(node);
-      if (image) result.push({ type: 'paragraph', content: [image] });
+      if (image) result.push(image);
       continue;
     }
 
@@ -286,7 +286,7 @@ function htmlBlocksFromDom(nodes) {
       if (image) result.push({ type: 'paragraph', content: [image] });
     } else if (tag === 'img') {
       const image = imageNode(node);
-      if (image) result.push(image);
+      if (image) result.push({ type: 'paragraph', content: [image] });
     } else if (node.classList.contains('note-fact-card')) {
       const body = node.querySelector('.note-fact-content') || node;
       const content = htmlBlocksFromDom(body.childNodes);
