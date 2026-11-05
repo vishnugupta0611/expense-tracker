@@ -8,6 +8,7 @@ import InstallPrompt from './components/InstallPrompt';
 import SplashScreen from './components/SplashScreen';
 import './styles/global.css';
 import './App.css';
+import { getNotificationToken } from './getNotificationToken';
 
 import LandingPage from './pages/LandingPage';
 import AuthPage from './pages/AuthPage';
