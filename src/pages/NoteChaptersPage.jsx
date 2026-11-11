@@ -95,6 +95,7 @@ const NoteChaptersPage = () => {
   const [imageUploading, setImageUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [textColor, setTextColor] = useState('#4f46e5');
+  const [codeLanguage, setCodeLanguage] = useState('javascript');
 
   const fileInputRef = useRef(null);
   const chapterIdRef = useRef(null);
@@ -772,7 +773,37 @@ const NoteChaptersPage = () => {
               <button type="button" title="Bullet list" disabled={!editor} className={editor?.isActive('bulletList') ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().toggleBulletList().run()}><List size={17} /></button>
               <button type="button" title="Numbered list" disabled={!editor} className={editor?.isActive('orderedList') ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().toggleOrderedList().run()}><ListOrdered size={17} /></button>
               <button type="button" title="Blockquote" disabled={!editor} className={editor?.isActive('blockquote') ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().toggleBlockquote().run()}><Quote size={16} /></button>
-              <button type="button" title="Code block" disabled={!editor} className={editor?.isActive('codeBlock') ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().toggleCodeBlock().run()}><Code2 size={16} /></button>
+              <button type="button" title="Toggle code block" aria-label="Toggle code block" disabled={!editor} className={editor?.isActive('codeBlock') ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => {
+                if (editor?.isActive('codeBlock')) editor.chain().focus().toggleCodeBlock().run();
+                else editor?.chain().focus().setCodeBlock({ language: codeLanguage === 'auto' ? null : codeLanguage }).run();
+              }}><Code2 size={16} /></button>
+              <select
+                className="note-tiptap-code-language"
+                aria-label="Code language"
+                title="Code language for the current or next code block"
+                value={codeLanguage}
+                onMouseDown={(event) => event.stopPropagation()}
+                onChange={(event) => {
+                  const language = event.target.value;
+                  setCodeLanguage(language);
+                  if (editor?.isActive('codeBlock')) {
+                    editor.chain().focus().updateAttributes('codeBlock', { language: language === 'auto' ? null : language }).run();
+                  }
+                }}
+                disabled={!editor}
+              >
+                <option value="auto">Auto</option>
+                <option value="javascript">JavaScript</option>
+                <option value="typescript">TypeScript</option>
+                <option value="python">Python</option>
+                <option value="json">JSON</option>
+                <option value="bash">Bash</option>
+                <option value="sql">SQL</option>
+                <option value="html">HTML</option>
+                <option value="css">CSS</option>
+                <option value="java">Java</option>
+                <option value="cpp">C++</option>
+              </select>
             </div>
             <span className="note-tiptap-toolbar-divider" />
             <div className="note-tiptap-toolbar-group">
