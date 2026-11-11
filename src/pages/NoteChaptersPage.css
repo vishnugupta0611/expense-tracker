@@ -489,6 +489,30 @@
   cursor: not-allowed;
 }
 
+.note-tiptap-code-language {
+  max-width: 112px;
+  height: 32px;
+  padding: 0 1.55rem 0 0.55rem;
+  border: 1px solid var(--nc-border);
+  border-radius: 7px;
+  outline: none;
+  background: var(--nc-bg);
+  color: var(--nc-text);
+  font: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.note-tiptap-code-language:focus-visible {
+  border-color: var(--nc-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--nc-accent) 18%, transparent);
+}
+
+.note-tiptap-code-language:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .note-tiptap-toolbar-divider {
   width: 1px;
   height: 22px;
