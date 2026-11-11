@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { EditorContent, useEditor } from '@tiptap/react';
 import {
   ArrowLeft, BookOpen, ChevronLeft, ChevronRight,
-  Code2, ImagePlus, List, ListOrdered, Plus, Quote, Save,
+  AlignCenter, AlignLeft, AlignRight, Code2, ImagePlus, List, ListOrdered, Plus, Quote, Save,
   Share2, Table2, Trash2, Type, X, Heading1, Heading2, Heading3,
   Bold, Italic, Underline, Highlighter, PanelLeft,
 } from 'lucide-react';
@@ -456,6 +456,12 @@ const NoteChaptersPage = () => {
     event.target.value = '';
     if (!file || !editor) return;
 
+    const allowedImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowedImageTypes.includes(file.type)) {
+      window.alert('Choose a JPG, PNG, WebP or GIF image.');
+      return;
+    }
+
     setImageUploading(true);
     try {
       const signatureResponse = await api.get('/notes/upload-signature');
@@ -771,7 +777,10 @@ const NoteChaptersPage = () => {
             <span className="note-tiptap-toolbar-divider" />
             <div className="note-tiptap-toolbar-group">
               <button type="button" title="Insert table" disabled={!editor} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}><Table2 size={16} /></button>
-              <button type="button" title="Insert image" disabled={!editor || imageUploading} onMouseDown={(event) => event.preventDefault()} onClick={() => fileInputRef.current?.click()}><ImagePlus size={16} /></button>
+              <button type="button" title="Insert image or animated GIF" aria-label="Insert image or animated GIF" disabled={!editor || imageUploading} onMouseDown={(event) => event.preventDefault()} onClick={() => fileInputRef.current?.click()}><ImagePlus size={16} /></button>
+              <button type="button" title="Align image left" aria-label="Align image left" disabled={!editor?.isActive('image')} className={editor?.getAttributes('image').position === 'left' ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().updateAttributes('image', { position: 'left' }).run()}><AlignLeft size={16} /></button>
+              <button type="button" title="Center image" aria-label="Center image" disabled={!editor?.isActive('image')} className={editor?.getAttributes('image').position === 'center' ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().updateAttributes('image', { position: 'center' }).run()}><AlignCenter size={16} /></button>
+              <button type="button" title="Align image right" aria-label="Align image right" disabled={!editor?.isActive('image')} className={editor?.getAttributes('image').position === 'right' ? 'active' : ''} onMouseDown={(event) => event.preventDefault()} onClick={() => editor?.chain().focus().updateAttributes('image', { position: 'right' }).run()}><AlignRight size={16} /></button>
               <button type="button" title="Insert fact card" disabled={!editor} onMouseDown={(event) => event.preventDefault()} onClick={insertFactCard}>💡</button>
             </div>
           </div>
@@ -799,7 +808,7 @@ const NoteChaptersPage = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
                   hidden
                   onChange={insertImage}
                 />
