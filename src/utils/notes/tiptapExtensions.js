@@ -1,10 +1,76 @@
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Extension, Node, mergeAttributes } from '@tiptap/core';
+import { Plugin } from '@tiptap/pm/state';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import hljs from 'highlight.js/lib/common';
 import Image from '@tiptap/extension-image';
 import Highlight from '@tiptap/extension-highlight';
 import Placeholder from '@tiptap/extension-placeholder';
 import { TableKit } from '@tiptap/extension-table';
 import { TextStyleKit } from '@tiptap/extension-text-style';
 import StarterKit from '@tiptap/starter-kit';
+
+function buildCodeHighlightDecorations(doc) {
+  if (typeof document === 'undefined') return DecorationSet.empty;
+
+  const decorations = [];
+
+  doc.descendants((node, position) => {
+    if (node.type.name !== 'codeBlock' || !node.textContent) return;
+
+    const source = node.textContent;
+    let highlighted;
+    try {
+      const language = node.attrs.language;
+      highlighted = language && hljs.getLanguage(language)
+        ? hljs.highlight(source, { language })
+        : hljs.highlightAuto(source);
+    } catch {
+      return;
+    }
+
+    const container = document.createElement('div');
+    container.innerHTML = highlighted.value;
+    let offset = 0;
+
+    const visit = (current, inheritedClasses = []) => {
+      if (current.nodeType === 3) {
+        const length = current.nodeValue?.length || 0;
+        if (length && inheritedClasses.length) {
+          decorations.push(Decoration.inline(
+            position + 1 + offset,
+            position + 1 + offset + length,
+            { class: inheritedClasses.join(' ') }
+          ));
+        }
+        offset += length;
+        return;
+      }
+
+      if (current.nodeType !== 1) return;
+      const ownClasses = Array.from(current.classList || []).filter((name) => (
+        name.startsWith('hljs-') || name.endsWith('_')
+      ));
+      const classes = [...new Set([...inheritedClasses, ...ownClasses])];
+      Array.from(current.childNodes).forEach((child) => visit(child, classes));
+    };
+
+    Array.from(container.childNodes).forEach((child) => visit(child));
+  });
+
+  return DecorationSet.create(doc, decorations);
+}
+
+const CodeSyntaxHighlight = Extension.create({
+  name: 'codeSyntaxHighlight',
+
+  addProseMirrorPlugins() {
+    return [new Plugin({
+      props: {
+        decorations: (state) => buildCodeHighlightDecorations(state.doc),
+      },
+    })];
+  },
+});
 
 const ImageWithMetadata = Image.extend({
   inline: true,
@@ -136,6 +202,7 @@ export const notesExtensions = [
     heading: { levels: [1, 2, 3, 4, 5, 6] },
     codeBlock: { HTMLAttributes: { class: 'note-code' } },
   }),
+  CodeSyntaxHighlight,
   TextStyleKit.configure({
     color: { types: ['textStyle'] },
     fontFamily: { types: ['textStyle'] },
