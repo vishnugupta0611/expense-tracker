@@ -79,6 +79,12 @@ const NoteChaptersPage = () => {
   const [chapters, setChapters] = useState([]);
   const [activeChapterId, setActiveChapterId] = useState(null);
   const [chapterTitle, setChapterTitle] = useState('');
+  const [createChapterOpen, setCreateChapterOpen] = useState(false);
+  const [newChapterTitle, setNewChapterTitle] = useState('');
+  const [newChapterDescription, setNewChapterDescription] = useState('');
+  const [creatingChapter, setCreatingChapter] = useState(false);
+  const [chapterCreateError, setChapterCreateError] = useState('');
+
   const [loading, setLoading] = useState(true);
   const [chapterLoading, setChapterLoading] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -323,22 +329,46 @@ const NoteChaptersPage = () => {
     }
   };
 
-  const createChapter = async () => {
-    const name = window.prompt('Chapter name');
-    if (!name?.trim()) return;
+  const createChapter = () => {
+    setNewChapterTitle('');
+    setNewChapterDescription('');
+    setChapterCreateError('');
+    setCreateChapterOpen(true);
+  };
 
+  const closeCreateChapter = () => {
+    if (creatingChapter) return;
+    setCreateChapterOpen(false);
+    setChapterCreateError('');
+  };
+
+  const submitCreateChapter = async (event) => {
+    event.preventDefault();
+    const name = newChapterTitle.trim();
+    if (!name || creatingChapter) return;
+
+    setCreatingChapter(true);
+    setChapterCreateError('');
     try {
       await saveNow();
       const response = await api.post('/notes/' + id + '/chapters', {
-        title: name.trim(),
+        title: name,
+        description: newChapterDescription.trim(),
       });
       const chapter = response.data.chapter;
+      if (!chapter?._id) throw new Error('The server did not return the created chapter.');
+
       setChapters((current) => [...current, chapter].sort((a, b) => a.order - b.order));
       setActiveChapterId(chapter._id);
       setViewMode('chapters');
       setMobileNavOpen(false);
+      setCreateChapterOpen(false);
+      setNewChapterTitle('');
+      setNewChapterDescription('');
     } catch (error) {
-      window.alert(error.response?.data?.error || 'Could not create chapter.');
+      setChapterCreateError(error.response?.data?.error || error.message || 'Could not create chapter.');
+    } finally {
+      setCreatingChapter(false);
     }
   };
 
@@ -778,7 +808,85 @@ const NoteChaptersPage = () => {
           </div>
           {imageUploading ? <div className="note-chapters-uploading">Uploading image…</div> : null}
         </main>
+
       </div>
+
+      {createChapterOpen ? (
+        <div
+          className="note-chapter-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeCreateChapter();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') closeCreateChapter();
+          }}
+        >
+          <section
+            className="note-chapter-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="note-chapter-modal-title"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="note-chapter-modal-heading">
+              <div>
+                <span>NOTE STRUCTURE</span>
+                <h2 id="note-chapter-modal-title">Create a chapter</h2>
+                <p>Add a focused section to this note. Its content starts empty.</p>
+              </div>
+              <button
+                type="button"
+                className="note-chapter-modal-close"
+                onClick={closeCreateChapter}
+                aria-label="Close create chapter dialog"
+                disabled={creatingChapter}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={submitCreateChapter}>
+              <label className="note-chapter-modal-field">
+                <span>Chapter title</span>
+                <input
+                  autoFocus
+                  required
+                  maxLength={160}
+                  value={newChapterTitle}
+                  onChange={(event) => setNewChapterTitle(event.target.value)}
+                  placeholder="e.g. MCP Architecture"
+                  disabled={creatingChapter}
+                />
+              </label>
+              <label className="note-chapter-modal-field">
+                <span>Description <small>Optional</small></span>
+                <textarea
+                  rows={3}
+                  maxLength={1000}
+                  value={newChapterDescription}
+                  onChange={(event) => setNewChapterDescription(event.target.value)}
+                  placeholder="What will this chapter cover?"
+                  disabled={creatingChapter}
+                />
+              </label>
+
+              {chapterCreateError ? (
+                <p className="note-chapter-modal-error" role="alert">{chapterCreateError}</p>
+              ) : null}
+
+              <div className="note-chapter-modal-actions">
+                <button type="button" onClick={closeCreateChapter} disabled={creatingChapter}>
+                  Cancel
+                </button>
+                <button type="submit" disabled={!newChapterTitle.trim() || creatingChapter}>
+                  {creatingChapter ? 'Creating…' : 'Create chapter'}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </div>
   );
 };
